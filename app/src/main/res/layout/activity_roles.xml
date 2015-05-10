@@ -1,0 +1,47 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    tools:context="{relativePackage}.${activityClass}" >
+
+    <LinearLayout android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:layout_marginTop="5dip"
+        android:layout_marginBottom="5dip"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_above="@+id/footerlayout"
+        android:id="@+id/listviewlayout">
+        <ListView
+            android:id="@+id/list"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            tools:listitem="@layout/mylist">
+        </ListView>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/footerlayout"
+        android:layout_height="65dip"
+        android:orientation="horizontal"
+        android:layout_width="fill_parent"
+        android:gravity="center"
+        android:layout_alignParentBottom="true"
+        android:layout_margin="5dp">
+        <Button
+            android:id="@+id/bCreate"
+            android:text="Create account"
+            android:layout_width="0dip"
+            android:layout_height="60dip"
+            android:layout_weight="1"
+            android:layout_marginRight="2.5dp">
+        </Button>
+        <Button
+            android:id="@+id/bShare"
+            android:text="Share"
+            android:layout_width="0dip"
+            android:layout_height="60dip"
+            android:layout_weight="1"
+            android:layout_marginLeft="2.5dp">
+        </Button>
+    </LinearLayout>
+</RelativeLayout>
