@@ -9,12 +9,13 @@ import android.widget.Adapter;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
-//import org.joda.time.DateTime;
+import org.joda.time.DateTime;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import be.tiemencelis.beans.ConnectInfo;
+import be.tiemencelis.security.SecurityHandler;
 
 //import be.tiemencelis.beans.PolicyUpdate;
 

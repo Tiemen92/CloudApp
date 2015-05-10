@@ -18,8 +18,7 @@ android {
         }
     }
     sourceSets {
-        main.java.srcDirs += 'src/main/../../../../Dependencies/src/'
-
+        main.java.srcDirs += 'src/main/../../../../Dropbox/Jaar 2014-2015/Semester 1/Masterproef/Implementation/Dependencies/src/'
     }
     android {
         packagingOptions {
