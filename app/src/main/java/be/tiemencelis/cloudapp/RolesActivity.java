@@ -14,6 +14,7 @@ import org.joda.time.DateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import be.tiemencelis.accesspolicy.Policy;
 import be.tiemencelis.beans.ConnectInfo;
 import be.tiemencelis.security.SecurityHandler;
 
@@ -38,7 +39,7 @@ public class RolesActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_roles);
-
+        Policy pol;
         ListView list = (ListView) findViewById(R.id.list);
 
         list.setAdapter(new ArrayAdapter<String>(
