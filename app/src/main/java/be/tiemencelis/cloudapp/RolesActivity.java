@@ -1,68 +1,92 @@
 package be.tiemencelis.cloudapp;
 
-import android.app.ListActivity;
-import android.support.v7.app.AppCompatActivity;
+import android.content.Intent;
 import android.os.Bundle;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.widget.Adapter;
+import android.support.v7.app.AppCompatActivity;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
-import org.joda.time.DateTime;
-
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import be.tiemencelis.accesspolicy.Policy;
-import be.tiemencelis.beans.ConnectInfo;
-import be.tiemencelis.security.SecurityHandler;
-
-//import be.tiemencelis.beans.PolicyUpdate;
+import be.tiemencelis.beans.FileMeta;
 
 
 public class RolesActivity extends AppCompatActivity {
-    String[] itemname ={
-                        "Safari",
-                        "Camera",
-                        "Global",
-                        "FireFox",
-                        "UC Browser",
-                        "Android Folder",
-                        "VLC Player",
-                        "Cold War",
-                        "Windows",
-                        "Linux",
-                        "Macshit" };
+    private String[] roles = {"Tiemen", "Teeman", "Rol 3" };
+
+    public RolesActivity() {
+        //TODO roles inlezen
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_roles);
-        Policy pol;
+
         ListView list = (ListView) findViewById(R.id.list);
 
-        list.setAdapter(new ArrayAdapter<String>(
-                this, R.layout.mylist,
-                R.id.Itemname, itemname));
+        list.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, roles));
 
-        //fillList();
+        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                // TODO root folder opvragen met gekozen rol
+                ArrayList<FileMeta> files = new ArrayList<FileMeta>();
+                FileBrowserActivity activity;
+                Bundle b;
+                Intent i;
+
+                switch (position) {
+                    case 0:
+                        files.add(new FileMeta("Folder 1", System.currentTimeMillis()));
+                        files.add(new FileMeta("File c", 45456, System.currentTimeMillis()));
+                        files.add(new FileMeta("Folder 2", System.currentTimeMillis()));
+                        files.add(new FileMeta("File a", 1564454, System.currentTimeMillis()));
+                        files.add(new FileMeta("File b", 315644, System.currentTimeMillis()));
+
+                        b = new Bundle();
+                        b.putString("location", "/");
+                        b.putString("role", roles[position]);
+                        b.putSerializable("files", files);
+                        i = new Intent(RolesActivity.this, FileBrowserActivity.class);
+                        i.putExtras(b);
+                        startActivity(i);
+                        break;
+                    case 1:
+                        files.add(new FileMeta("Folder 2", System.currentTimeMillis()));
+                        files.add(new FileMeta("File a", 1564454, System.currentTimeMillis()));
+                        files.add(new FileMeta("File b", 315644, System.currentTimeMillis()));
+
+                        b = new Bundle();
+                        b.putString("location", "/");
+                        b.putString("role", roles[position]);
+                        b.putSerializable("files", files);
+                        i = new Intent(RolesActivity.this, FileBrowserActivity.class);
+                        i.putExtras(b);
+                        startActivity(i);
+                        break;
+                    case 2:
+                        files.add(new FileMeta("Folder 1", System.currentTimeMillis()));
+                        files.add(new FileMeta("File c", 45456, System.currentTimeMillis()));
+
+                        b = new Bundle();
+                        b.putString("location", "/");
+                        b.putString("role", roles[position]);
+                        b.putSerializable("files", files);
+                        i = new Intent(RolesActivity.this, FileBrowserActivity.class);
+                        i.putExtras(b);
+                        startActivity(i);
+                        break;
+                }
+            }
+        });
+
     }
 
 
-
-    /*private void fillList() {
-        ListView list = (ListView) findViewById(R.id.list);
-
-        ArrayList<String> content = new ArrayList<String>();
-        content.add("Tiemen");
-        content.add("Teeeman");
-        content.add("Role 3");
-        ArrayAdapter<String> adapter;
-
-        adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, content);
-        list.setAdapter(adapter);
-
-    }*/
 
 }

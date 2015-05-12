@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">Cloud App</string>
-    <string name="action_settings">Settings</string>
+    <string name="title_activity_roles">RolesActivity</string>
 </resources>
