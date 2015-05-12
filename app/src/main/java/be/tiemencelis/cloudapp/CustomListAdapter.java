@@ -2,6 +2,7 @@ package be.tiemencelis.cloudapp;
 
 /**
  * Created by Tiemen on 12-5-2015.
+ *
  */
 
 import android.app.Activity;
@@ -25,8 +26,6 @@ public class CustomListAdapter extends ArrayAdapter<FileMeta> {
 
     public CustomListAdapter(Activity context, String location, List<FileMeta> items) {
         super(context, R.layout.mylist, items);
-        // TODO Auto-generated constructor stub
-
         this.context=context;
         this.location = location;
         this.items = items;
@@ -54,5 +53,5 @@ public class CustomListAdapter extends ArrayAdapter<FileMeta> {
 
         return rowView;
 
-    };
+    }
 }

@@ -8,7 +8,6 @@ import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ListView;
 
 import java.util.ArrayList;
-import java.util.List;
 
 import be.tiemencelis.beans.FileMeta;
 
@@ -20,6 +19,7 @@ public class FileBrowserActivity extends AppCompatActivity {
 
 
     @Override
+    @SuppressWarnings("unchecked")
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_file_browser);
@@ -30,14 +30,6 @@ public class FileBrowserActivity extends AppCompatActivity {
         files = (ArrayList<FileMeta>) b.getSerializable("files");
 
         ListView list = (ListView) findViewById(R.id.list);
-        /*String folder = "";
-        List<FileMeta> files = new ArrayList<FileMeta>();
-        files.add(new FileMeta("Folder 1", System.currentTimeMillis()));
-        files.add(new FileMeta("File c", 45456, System.currentTimeMillis()));
-        files.add(new FileMeta("Folder 2", System.currentTimeMillis()));
-        files.add(new FileMeta("File a", 1564454, System.currentTimeMillis()));
-        files.add(new FileMeta("File b", 315644, System.currentTimeMillis()));*/
-
         list.setAdapter(new CustomListAdapter(this, location, files));
 
         list.setOnItemClickListener(new OnItemClickListener() {
