@@ -39,7 +39,7 @@ public class RolesActivity extends AppCompatActivity {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 // TODO root folder opvragen met gekozen rol
-                ArrayList<FileMeta> files = null;
+                ArrayList<FileMeta> files = new ArrayList<FileMeta>();
                 FileBrowserActivity activity;
                 Bundle b;
                 Intent i;
