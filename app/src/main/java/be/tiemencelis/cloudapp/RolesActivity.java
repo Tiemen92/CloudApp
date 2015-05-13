@@ -10,9 +10,7 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
 
-import java.io.File;
 import java.util.ArrayList;
-import java.util.List;
 
 import be.tiemencelis.beans.FileMeta;
 
@@ -33,13 +31,13 @@ public class RolesActivity extends AppCompatActivity {
 
         ListView list = (ListView) findViewById(R.id.list);
 
-        list.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, roles));
+        list.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, roles));
 
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, final int position, long id) {
                 // TODO root folder opvragen met gekozen rol
-                ArrayList<FileMeta> files = new ArrayList<FileMeta>();
+                ArrayList<FileMeta> files = new ArrayList<>();
                 Bundle b;
                 Intent i;
 
@@ -54,7 +52,7 @@ public class RolesActivity extends AppCompatActivity {
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                ArrayList<FileMeta> files = new ArrayList<FileMeta>();
+                                ArrayList<FileMeta> files = new ArrayList<>();
                                 Bundle b;
                                 Intent i;
                                 try {
