@@ -93,7 +93,6 @@ public class CommunicationHandler {
 
         if (((String) conn.receive()).equals("OK")) {
             token = (Map<String, byte[]>) conn.receive();
-            /*DateTime until = (DateTime) =  conn.receive();*/
             long until = (long) conn.receive();
             //TODO store token + until
         }
