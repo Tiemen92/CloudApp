@@ -35,4 +35,5 @@ dependencies {
     compile 'org.bouncycastle:bcpkix-jdk15on:1.52'
     compile 'com.google.maps:google-maps-services:0.1.7'
     compile 'org.apache.directory.studio:org.apache.commons.codec:1.8'
+    compile files('libs/priman2_AndroidLayer.jar')
 }
