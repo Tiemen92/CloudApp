@@ -46,7 +46,7 @@ public class FileBrowserActivity extends AppCompatActivity {
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 // TODO Auto-generated method stub
                 System.out.println("Clicked: \"" + location + files.get(position).getName() + "\" with role " + role);
-                PersistenceManager pman = Priman.getInstance().getPersistenceManager();
+                /*PersistenceManager pman = Priman.getInstance().getPersistenceManager();
 
                 try {
                     URI home = (new File("/sdcard/CloudApp/")).toURI();
@@ -56,7 +56,7 @@ public class FileBrowserActivity extends AppCompatActivity {
                     conn.close();
                 } catch (Exception e) {
                     e.printStackTrace();
-                }
+                }*/
             }
         });
     }
