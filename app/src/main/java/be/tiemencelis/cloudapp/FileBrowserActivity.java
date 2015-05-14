@@ -30,17 +30,20 @@ public class FileBrowserActivity extends AppCompatActivity {
         location = b.getString("location");
         role = b.getString("role");
         files = (ArrayList<FileMeta>) b.getSerializable("files");
+        setTitle("File browser: " + location); //TODO enkel mapnaam zetten, of scrollen?
 
         ListView list = (ListView) findViewById(R.id.list);
         list.setAdapter(new CustomListAdapter(this, files));
 
         list.setOnItemClickListener(new OnItemClickListener() {
             @Override
-            public void onItemClick(AdapterView<?> parent, View view, final int position, long id) {
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 // TODO Auto-generated method stub
                 System.out.println("Clicked: \"" + location + files.get(position).getName() + "\" with role " + role);
 
-                runOnUiThread(new Runnable() {
+                class LoadContents implements Runnable {
+                    int position;
+                    LoadContents(int position) {this.position = position;}
                     @Override
                     public void run() {
                         ArrayList<FileMeta> newFiles = null; //TODO check of op file of dir is geklikt!!!!!
@@ -56,7 +59,7 @@ public class FileBrowserActivity extends AppCompatActivity {
                             Toast.makeText(getApplicationContext(), "Authentication failed", Toast.LENGTH_LONG).show();
                         } else {
                             b = new Bundle();
-                            b.putString("location", location + newFiles.get(position).getName() + "/");
+                            b.putString("location", location + files.get(position).getName() + "/");
                             b.putString("role", role);
                             b.putSerializable("files", newFiles);
                             i = new Intent(FileBrowserActivity.this, FileBrowserActivity.class); //TODO of open file
@@ -64,7 +67,8 @@ public class FileBrowserActivity extends AppCompatActivity {
                             startActivity(i);
                         }
                     }
-                });
+                }
+                new Thread(new LoadContents(position)).start();
 
             }
         });

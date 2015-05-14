@@ -35,7 +35,7 @@ public class RolesActivity extends AppCompatActivity {
 
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
-            public void onItemClick(AdapterView<?> parent, View view, final int position, long id) {
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 // TODO root folder opvragen met gekozen rol
                 ArrayList<FileMeta> files = new ArrayList<>();
                 Bundle b;
@@ -49,7 +49,9 @@ public class RolesActivity extends AppCompatActivity {
                         files.add(new FileMeta("File a", 1564454, System.currentTimeMillis()));
                         files.add(new FileMeta("File b", 315644, System.currentTimeMillis()));*/
 
-                        runOnUiThread(new Runnable() {
+                        class LoadContents implements Runnable {
+                            int position;
+                            LoadContents(int position) {this.position = position;}
                             @Override
                             public void run() {
                                 ArrayList<FileMeta> files = new ArrayList<>();
@@ -74,8 +76,9 @@ public class RolesActivity extends AppCompatActivity {
                                     startActivity(i);
                                 }
                             }
-                        });
+                        }
 
+                        new Thread(new LoadContents(position)).start();
 
 
 

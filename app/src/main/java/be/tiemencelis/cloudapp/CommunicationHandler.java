@@ -1,7 +1,5 @@
 package be.tiemencelis.cloudapp;
 
-import android.os.Environment;
-
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
@@ -19,7 +17,7 @@ import be.tiemencelis.beans.FileMeta;
  *
  */
 public class CommunicationHandler {
-    private static final URI home = (new File(Environment.getExternalStorageDirectory().getPath() + "CloudApp/")).toURI();
+    private static final URI home = (new File("/sdcard/CloudApp/")).toURI();
     private static final SSLParameters cloudParam = Priman.getInstance().getPersistenceManager().load(home.resolve("cloudConnection-ssl.param"));
     private static final SSLParameters verificationParam = Priman.getInstance().getPersistenceManager().load(home.resolve("verificationConnection-ssl.param"));
 
