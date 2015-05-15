@@ -75,6 +75,57 @@ public class CommunicationHandler {
 
 
     @SuppressWarnings("unchecked")
+    public static byte[] requestFileContents(String role, String location) throws Exception {
+        byte[] result = null;
+
+        Connection conn = Priman.getInstance().getConnectionManager().getConnection(cloudParam);
+
+        ConnectInfo info = new ConnectInfo();
+        info.setAction("r");
+        info.setRel_location(location);
+        info.setRole(role);
+
+        conn.send("REQUEST_FILE");
+        conn.send(info);
+
+        switch ((String) conn.receive()) {
+            case "OK":
+                System.out.println("Token valid: receiving contents");
+                //meta = (FileMeta) conn.receive(); TODO momenteel niet nodig
+                result = (byte[]) conn.receive();
+                conn.close();
+                break;
+            case "AUTHENTICATE":
+                System.out.println("Need to authenticate");
+                UUID session = (UUID) conn.receive();
+                conn.close();
+
+                Map<String, byte[]> token = getToken(role, "r", session);
+                if (token != null) {
+                    System.out.println("Token received");
+                    conn = Priman.getInstance().getConnectionManager().getConnection(cloudParam);
+                    info.setAuthToken(token);
+
+                    conn.send("REQUEST_FILE");
+                    conn.send(info);
+
+                    if (((String) conn.receive()).equals("OK")) {
+                        System.out.println("Token valid: receiving contents");
+                        //meta = (FileMeta) conn.receive(); TODO momenteel niet nodig
+                        result = (byte[]) conn.receive();
+                        conn.close();
+                    }
+                }
+
+                break;
+        }
+
+
+        return result;
+    }
+
+
+    @SuppressWarnings("unchecked")
     private static Map<String, byte[]> getToken(String role, String action, UUID session) throws Exception {
         Map<String, byte[]> token = null;
 
