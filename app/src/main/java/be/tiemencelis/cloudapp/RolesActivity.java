@@ -10,9 +10,7 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
 
-import java.io.File;
 import java.util.ArrayList;
-import java.util.List;
 
 import be.tiemencelis.beans.FileMeta;
 
@@ -33,14 +31,13 @@ public class RolesActivity extends AppCompatActivity {
 
         ListView list = (ListView) findViewById(R.id.list);
 
-        list.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, roles));
+        list.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, roles));
 
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 // TODO root folder opvragen met gekozen rol
-                ArrayList<FileMeta> files = new ArrayList<FileMeta>();
-                FileBrowserActivity activity;
+                ArrayList<FileMeta> files = new ArrayList<>();
                 Bundle b;
                 Intent i;
 
@@ -52,24 +49,37 @@ public class RolesActivity extends AppCompatActivity {
                         files.add(new FileMeta("File a", 1564454, System.currentTimeMillis()));
                         files.add(new FileMeta("File b", 315644, System.currentTimeMillis()));*/
 
-                        try {
-                            files = CommunicationHandler.requestDirectoryContents(roles[position], "/");
-                        } catch (Exception e) {
-                            e.printStackTrace();
+                        class LoadContents implements Runnable {
+                            int position;
+                            LoadContents(int position) {this.position = position;}
+                            @Override
+                            public void run() {
+                                ArrayList<FileMeta> files = new ArrayList<>();
+                                Bundle b;
+                                Intent i;
+                                try {
+                                    files = CommunicationHandler.requestDirectoryContents(roles[position], "/");
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+
+                                if (files == null) {
+                                    Toast.makeText(getApplicationContext(), "Authentication failed", Toast.LENGTH_LONG).show();
+                                }
+                                else {
+                                    b = new Bundle();
+                                    b.putString("location", "/");
+                                    b.putString("role", roles[position]);
+                                    b.putSerializable("files", files);
+                                    i = new Intent(RolesActivity.this, FileBrowserActivity.class);
+                                    i.putExtras(b);
+                                    startActivity(i);
+                                }
+                            }
                         }
 
-                        if (files == null) {
-                            Toast.makeText(getApplicationContext(), "Authentication failed", Toast.LENGTH_LONG).show();
-                        }
-                        else {
-                            b = new Bundle();
-                            b.putString("location", "/");
-                            b.putString("role", roles[position]);
-                            b.putSerializable("files", files);
-                            i = new Intent(RolesActivity.this, FileBrowserActivity.class);
-                            i.putExtras(b);
-                            startActivity(i);
-                        }
+                        new Thread(new LoadContents(position)).start();
+
 
 
                         break;

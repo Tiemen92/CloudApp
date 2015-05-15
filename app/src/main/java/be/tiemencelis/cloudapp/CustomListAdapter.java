@@ -13,7 +13,7 @@ import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.List;
 
 import be.tiemencelis.beans.FileMeta;
@@ -21,13 +21,11 @@ import be.tiemencelis.beans.FileMeta;
 public class CustomListAdapter extends ArrayAdapter<FileMeta> {
 
     private final Activity context;
-    private String location;
     private List<FileMeta> items;
 
-    public CustomListAdapter(Activity context, String location, List<FileMeta> items) {
+    public CustomListAdapter(Activity context, List<FileMeta> items) {
         super(context, R.layout.mylist, items);
         this.context=context;
-        this.location = location;
         this.items = items;
     }
 
@@ -41,7 +39,7 @@ public class CustomListAdapter extends ArrayAdapter<FileMeta> {
         TextView modified = (TextView) rowView.findViewById(R.id.modified);
 
         txtTitle.setText(items.get(position).getName());
-        modified.setText(items.get(position).getLastModified().toString());
+        modified.setText(SimpleDateFormat.getDateTimeInstance().format(items.get(position).getLastModified()));
         if (items.get(position).isDirectory()) {
             imageView.setImageResource(R.drawable.folder);
             size.setText("");

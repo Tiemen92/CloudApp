@@ -1,11 +1,8 @@
 package be.tiemencelis.cloudapp;
 
-import org.joda.time.DateTime;
-
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -14,7 +11,6 @@ import be.kuleuven.cs.priman.connection.Connection;
 import be.kuleuven.cs.primanprovider.connection.ssl.SSLParameters;
 import be.tiemencelis.beans.ConnectInfo;
 import be.tiemencelis.beans.FileMeta;
-import be.tiemencelis.beans.PolicyResponseRequest;
 
 /**
  * Created by Tiemen on 12-5-2015.
@@ -26,9 +22,10 @@ public class CommunicationHandler {
     private static final SSLParameters verificationParam = Priman.getInstance().getPersistenceManager().load(home.resolve("verificationConnection-ssl.param"));
 
 
+    @SuppressWarnings("unchecked")
     public static ArrayList<FileMeta> requestDirectoryContents(String role, String location) throws Exception {
         ArrayList<FileMeta> result = null;
-        FileMeta meta;
+        //FileMeta meta;
 
         Connection conn = Priman.getInstance().getConnectionManager().getConnection(cloudParam);
 
@@ -43,7 +40,7 @@ public class CommunicationHandler {
         switch ((String) conn.receive()) {
             case "OK":
                 System.out.println("Token valid: receiving contents");
-                meta = (FileMeta) conn.receive();
+                //meta = (FileMeta) conn.receive(); TODO momenteel niet nodig
                 result = (ArrayList<FileMeta>) conn.receive();
                 conn.close();
                 break;
@@ -63,7 +60,7 @@ public class CommunicationHandler {
 
                     if (((String) conn.receive()).equals("OK")) {
                         System.out.println("Token valid: receiving contents");
-                        meta = (FileMeta) conn.receive();
+                        //meta = (FileMeta) conn.receive(); TODO momenteel niet nodig
                         result = (ArrayList<FileMeta>) conn.receive();
                         conn.close();
                     }
@@ -77,6 +74,7 @@ public class CommunicationHandler {
     }
 
 
+    @SuppressWarnings("unchecked")
     private static Map<String, byte[]> getToken(String role, String action, UUID session) throws Exception {
         Map<String, byte[]> token = null;
 
@@ -93,7 +91,6 @@ public class CommunicationHandler {
 
         if (((String) conn.receive()).equals("OK")) {
             token = (Map<String, byte[]>) conn.receive();
-            /*DateTime until = (DateTime) =  conn.receive();*/
             long until = (long) conn.receive();
             //TODO store token + until
         }
