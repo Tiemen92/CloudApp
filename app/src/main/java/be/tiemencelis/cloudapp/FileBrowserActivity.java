@@ -1,6 +1,7 @@
 package be.tiemencelis.cloudapp;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
@@ -107,6 +108,14 @@ public class FileBrowserActivity extends AppCompatActivity {
                     bos.write(content);
                     bos.flush();
                     bos.close();
+
+                    Uri file = Uri.parse("file:///sdcard/CloudApp/" + files.get(position).getName());
+                    Intent intent = new Intent(Intent.ACTION_EDIT, file);
+                    intent.setType("text/plain");
+                    Intent chooser = Intent.createChooser(intent, "Open file with");
+                    if (intent.resolveActivity(getPackageManager()) != null) {
+                        startActivity(chooser);
+                    }
                     //TODO open file na save
                 }
             } catch (Exception e) {
