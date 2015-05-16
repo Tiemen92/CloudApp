@@ -111,14 +111,6 @@ public class FileBrowserActivity extends AppCompatActivity {
                     bos.flush();
                     bos.close();
 
-                    /*Uri file = Uri.parse("file:///sdcard/CloudApp/" + files.get(position).getName());
-                    Intent intent = new Intent(Intent.ACTION_EDIT, file);
-                    intent.setType("text/plain");
-                    Intent chooser = Intent.createChooser(intent, "Open file with");
-                    if (intent.resolveActivity(getPackageManager()) != null) {
-                        startActivity(chooser);
-                    }*/
-                    //TODO open file na save
 
                     Intent viewIntent = new Intent(Intent.ACTION_VIEW);
                     Intent editIntent = new Intent(Intent.ACTION_EDIT);
@@ -128,15 +120,17 @@ public class FileBrowserActivity extends AppCompatActivity {
                         System.out.println("No extension found in: " + files.get(position).getName());
                         throw new Exception("Extension not found");
                     }
+                    System.out.println("Extension: " + extension);
                     String mime = myMime.getMimeTypeFromExtension(extension);
                     if (mime == null) {
                         System.out.println("No Mime/type found for extension " + extension);
                         mime = "text/*";
                     }
+                    System.out.println("MIME/type: " + mime);
                     editIntent.setDataAndType(Uri.fromFile(new File("/sdcard/CloudApp/data/" + files.get(position).getName())), mime);
                     viewIntent.setDataAndType(Uri.fromFile(new File("/sdcard/CloudApp/data/" + files.get(position).getName())), mime);
-                    Intent j = Intent.createChooser(editIntent, "Open file with:");
-                    j.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[] { viewIntent });
+                    Intent j = Intent.createChooser(viewIntent, "Open file with:");
+                    j.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[] { editIntent });
                     startActivity(j);
                 }
             } catch (Exception e) {
@@ -145,24 +139,5 @@ public class FileBrowserActivity extends AppCompatActivity {
         }
     }
 
-
-    private String fileExt(String url) {
-        if (url.indexOf("?") > -1) {
-            url = url.substring(0, url.indexOf("?"));
-        }
-        if (url.lastIndexOf(".") == -1) {
-            return null;
-        } else {
-            String ext = url.substring(url.lastIndexOf("."));
-            if (ext.indexOf("%") > -1) {
-                ext = ext.substring(0, ext.indexOf("%"));
-            }
-            if (ext.indexOf("/") > -1) {
-                ext = ext.substring(0, ext.indexOf("/"));
-            }
-            return ext.toLowerCase();
-
-        }
-    }
 
 }

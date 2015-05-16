@@ -39,19 +39,13 @@ public class RolesActivity extends AppCompatActivity {
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                // TODO root folder opvragen met gekozen rol
                 ArrayList<FileMeta> files = new ArrayList<>();
                 Bundle b;
                 Intent i;
 
                 switch (position) {
                     case 0:
-                        /*files.add(new FileMeta("Folder 1", System.currentTimeMillis()));
-                        files.add(new FileMeta("File c", 45456, System.currentTimeMillis()));
-                        files.add(new FileMeta("Folder 2", System.currentTimeMillis()));
-                        files.add(new FileMeta("File a", 1564454, System.currentTimeMillis()));
-                        files.add(new FileMeta("File b", 315644, System.currentTimeMillis()));*/
-
+                        /*TODO class uit functie halen*/
                         class LoadContents implements Runnable {
                             int position;
 
@@ -90,8 +84,9 @@ public class RolesActivity extends AppCompatActivity {
                         break;
                     case 1:
                         files.add(new FileMeta("Folder 2", System.currentTimeMillis()));
-                        files.add(new FileMeta("File a", 1564454, System.currentTimeMillis()));
-                        files.add(new FileMeta("File b", 315644, System.currentTimeMillis()));
+                        files.add(new FileMeta("file.pdf", 1564454, System.currentTimeMillis()));
+                        files.add(new FileMeta("File b.txt", 315644, System.currentTimeMillis()));
+                        files.add(new FileMeta("File", 2157444, System.currentTimeMillis()));
 
                         b = new Bundle();
                         b.putString("location", "/");
@@ -123,10 +118,7 @@ public class RolesActivity extends AppCompatActivity {
 
             @Override
             public void onClick(View v) {
-                Intent myIntent = new Intent(Intent.ACTION_EDIT);
-                myIntent.setDataAndType(Uri.fromFile(new File("/sdcard/CloudApp/policy.txt")), "text/*");
-                Intent j = Intent.createChooser(myIntent, "Choose an application to open with:");
-                startActivity(j);
+                //TODO maak account
             }
         });
 
