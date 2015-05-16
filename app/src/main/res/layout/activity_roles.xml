@@ -32,7 +32,8 @@
             android:layout_width="0dip"
             android:layout_height="60dip"
             android:layout_weight="1"
-            android:layout_marginRight="2.5dp">
+            android:layout_marginRight="2.5dp"
+            android:clickable="false">
         </Button>
         <Button
             android:id="@+id/bShare"

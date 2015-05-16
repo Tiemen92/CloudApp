@@ -1,15 +1,18 @@
 package be.tiemencelis.cloudapp;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.StrictMode;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import java.io.File;
 import java.util.ArrayList;
 
 import be.tiemencelis.beans.FileMeta;
@@ -51,7 +54,11 @@ public class RolesActivity extends AppCompatActivity {
 
                         class LoadContents implements Runnable {
                             int position;
-                            LoadContents(int position) {this.position = position;}
+
+                            LoadContents(int position) {
+                                this.position = position;
+                            }
+
                             @Override
                             public void run() {
                                 ArrayList<FileMeta> files = new ArrayList<>();
@@ -65,8 +72,7 @@ public class RolesActivity extends AppCompatActivity {
 
                                 if (files == null) {
                                     Toast.makeText(getApplicationContext(), "Authentication failed", Toast.LENGTH_LONG).show();
-                                }
-                                else {
+                                } else {
                                     b = new Bundle();
                                     b.putString("location", "/");
                                     b.putString("role", roles[position]);
@@ -79,7 +85,6 @@ public class RolesActivity extends AppCompatActivity {
                         }
 
                         new Thread(new LoadContents(position)).start();
-
 
 
                         break;
@@ -109,6 +114,19 @@ public class RolesActivity extends AppCompatActivity {
                         startActivity(i);
                         break;
                 }
+            }
+        });
+
+
+        Button createButton = (Button) findViewById(R.id.bCreate);
+        createButton.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                Intent myIntent = new Intent(Intent.ACTION_EDIT);
+                myIntent.setDataAndType(Uri.fromFile(new File("/sdcard/CloudApp/policy.txt")), "text/*");
+                Intent j = Intent.createChooser(myIntent, "Choose an application to open with:");
+                startActivity(j);
             }
         });
 
