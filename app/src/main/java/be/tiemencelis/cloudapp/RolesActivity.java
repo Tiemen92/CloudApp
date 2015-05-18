@@ -16,6 +16,7 @@ import java.io.File;
 import java.util.ArrayList;
 
 import be.tiemencelis.beans.FileMeta;
+import be.tiemencelis.context.ContextManager;
 
 
 public class RolesActivity extends AppCompatActivity {
@@ -33,8 +34,9 @@ public class RolesActivity extends AppCompatActivity {
         StrictMode.setThreadPolicy(policy);
 
         ListView list = (ListView) findViewById(R.id.list);
-
         list.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, roles));
+
+        ContextManager.init(this);
 
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
