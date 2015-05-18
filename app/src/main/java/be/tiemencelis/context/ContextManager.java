@@ -20,9 +20,12 @@ import android.telephony.cdma.CdmaCellLocation;
 import android.telephony.gsm.GsmCellLocation;
 
 import org.apache.commons.net.ntp.TimeStamp;
+import org.joda.time.DateTime;
 
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import be.kuleuven.cs.priman.manager.ConnectionManager;
@@ -45,6 +48,8 @@ public class ContextManager extends BroadcastReceiver {
 
     private static BluetoothManager bluetoothManager;
     private static Set<BluetoothDevice> connectedBluetoothDevices;
+
+    private static Map<Long, String> lastNFCTags;
 
     private static long lastNtpTime = 0;
 
@@ -85,6 +90,8 @@ public class ContextManager extends BroadcastReceiver {
         for (BluetoothDevice dev : connectedBluetoothDevices) {
             System.out.println("Device: " + dev.getName());
         }
+
+        lastNFCTags = new HashMap<Long, String>();
 
         /*Request ntp time as init value*/
         try {
@@ -180,6 +187,11 @@ public class ContextManager extends BroadcastReceiver {
         return connectedBluetoothDevices;
     }
 
+
+    public static void addLastNFCTags(long time, String tag) {
+        System.out.println("Time: " + time + " Tag: " + tag);
+        ContextManager.lastNFCTags.put(time, tag);
+    }
 
     /**
      * Listener for changes of the wifi connection. SHOULD NOT BE CALLED!
