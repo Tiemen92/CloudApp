@@ -17,6 +17,7 @@ import java.util.ArrayList;
 
 import be.tiemencelis.beans.FileMeta;
 import be.tiemencelis.context.ContextManager;
+import be.tiemencelis.context.NfcActivity;
 
 
 public class RolesActivity extends AppCompatActivity {
@@ -121,6 +122,8 @@ public class RolesActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 //TODO maak account
+                Intent i = new Intent(RolesActivity.this, NfcActivity.class);
+                startActivity(i);
             }
         });
 

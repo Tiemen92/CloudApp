@@ -1,11 +1,16 @@
 package be.tiemencelis.context;
 
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.ConnectivityManager;
+import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
@@ -17,6 +22,10 @@ import android.telephony.gsm.GsmCellLocation;
 import org.apache.commons.net.ntp.TimeStamp;
 
 import java.util.Date;
+import java.util.List;
+import java.util.Set;
+
+import be.kuleuven.cs.priman.manager.ConnectionManager;
 
 /**
  * Created by Tiemen on 18-5-2015.
@@ -34,10 +43,16 @@ public class ContextManager extends BroadcastReceiver {
     private static WifiManager wifiManager;
     private static WifiInfo currentWifiConnection = null;
 
+    private static BluetoothManager bluetoothManager;
+    private static Set<BluetoothDevice> connectedBluetoothDevices;
+
     private static long lastNtpTime = 0;
 
 
-
+    /**
+     * Initialise all context types and listeners
+     * @param context
+     */
     public static void init(Context context) {
         ContextManager.context = context;
 
@@ -56,10 +71,19 @@ public class ContextManager extends BroadcastReceiver {
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000*30, 0, locationListener);
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000*60, 0, locationListener);
 
+        /*Request current wifi information*/
         wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
         if (wifiManager.isWifiEnabled()) {
             currentWifiConnection = wifiManager.getConnectionInfo();
             System.out.println("Wifi: " + currentWifiConnection.getSSID());
+        }
+
+        /*Request current bluetooth information*/
+        bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
+        connectedBluetoothDevices = bluetoothManager.getAdapter().getBondedDevices();
+        System.out.println("Connected bluetooth devices: ");
+        for (BluetoothDevice dev : connectedBluetoothDevices) {
+            System.out.println("Device: " + dev.getName());
         }
 
         /*Request ntp time as init value*/
@@ -71,11 +95,19 @@ public class ContextManager extends BroadcastReceiver {
     }
 
 
-    public static Location getLastLocation() {
+    /**
+     * Get location
+     * @return best and most recent location
+     */
+    public static Location getLocation() {
         return lastLocation;
     }
 
 
+    /**
+     * Get the connected cell tower id
+     * @return cell id as int
+     */
     public static int getCellId() {
         TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
         GsmCellLocation cellLocation = (GsmCellLocation) telephonyManager.getCellLocation();
@@ -86,7 +118,22 @@ public class ContextManager extends BroadcastReceiver {
     }
 
 
+    /**
+     * Get the current timestamp based on the machine time
+     * @return timestamp in milliseconds (Unix format)
+     */
+    public static long getSystemTime() {
+        return System.currentTimeMillis();
+    }
+
+
     /*TODO threaded, meerdere ip's proberen?, volledige classe threaded en maar 1 keer! (oncreate komt altijd opnieuw bij scherm wijziging)*/
+    /**
+     * Get a ntp timestamp which is not older than the specified age (based on system time)
+     * @param maxAge maximum age in milliseconds!
+     * @return timestamp in milliseconds (Unix format)
+     * @throws Exception when ntp request failed
+     */
     public static long getNtpTime(long maxAge) throws Exception {
         long ntpTime;
 
@@ -96,6 +143,7 @@ public class ContextManager extends BroadcastReceiver {
 
         try {
             lastNtpTime = Time.getNtpTime();
+            System.out.println("System time: " + System.currentTimeMillis());
             System.out.println("NTP time: " + lastNtpTime);
         } catch (Exception e) {
             System.out.println("Error fetching NTP time from " + Time.serverName);
@@ -106,18 +154,55 @@ public class ContextManager extends BroadcastReceiver {
     }
 
 
+    /**
+     * Get the connected wifi connection info
+     * @return WifiInfo is current connection
+     */
+    public WifiInfo getCurrentWifiConnection() {
+        return currentWifiConnection;
+    }
+
+
+    /**
+     * Get a list of all configured wifi networks of the device
+     * @return List of WifiConfiguration objects
+     */
+    public List<WifiConfiguration> getConfiguredWifi() {
+        return wifiManager.getConfiguredNetworks();
+    }
+
+
+    /**
+     * Get a set of all the connected bluetooth devices.
+     * @return Set of BluetoothDevice objects
+     */
+    public Set<BluetoothDevice> getConnectedBluetoothDevices() {
+        return connectedBluetoothDevices;
+    }
+
+
+    /**
+     * Listener for changes of the wifi connection. SHOULD NOT BE CALLED!
+     * @param context
+     * @param intent
+     */
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (wifiManager.isWifiEnabled()) {
+        String action = intent.getAction();
+        if (action.equals(ConnectivityManager.CONNECTIVITY_ACTION)) {
+            System.out.println("BROADCAST RECEIVER: Wifi changed");
             currentWifiConnection = wifiManager.getConnectionInfo();
-            System.out.println("Wifi: " + currentWifiConnection.getSSID());
         }
-        else {
-            currentWifiConnection = null;
+        else if (action.equals(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED)) {
+            System.out.println("BROADCAST RECEIVER: Bluetooth changed");
+            connectedBluetoothDevices = bluetoothManager.getAdapter().getBondedDevices();
         }
     }
 
 
+    /**
+     * Listener for location updates
+     */
     private static LocationListener locationListener = new LocationListener() {
         public void onLocationChanged(Location location) {
             if (isBetterLocation(location, lastLocation)) {
@@ -136,12 +221,13 @@ public class ContextManager extends BroadcastReceiver {
     };
 
 
-    /** Determines whether one Location reading is better than the current Location fix
+    /**
+     * Determines whether one Location reading is better than the current Location fix
      * @param location  The new Location that you want to evaluate
      * @param currentBestLocation  The current Location fix, to which you want to compare the new one
      * Source: Google
      */
-    protected static boolean isBetterLocation(Location location, Location currentBestLocation) {
+    private static boolean isBetterLocation(Location location, Location currentBestLocation) {
         if (currentBestLocation == null) {
             // A new location is always better than no location
             return true;
