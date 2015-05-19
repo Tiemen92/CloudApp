@@ -9,8 +9,16 @@ import java.util.UUID;
 import be.kuleuven.cs.priman.Priman;
 import be.kuleuven.cs.priman.connection.Connection;
 import be.kuleuven.cs.primanprovider.connection.ssl.SSLParameters;
+import be.tiemencelis.accesspolicy.AccessPolicyParser;
+import be.tiemencelis.accesspolicy.Policy;
+import be.tiemencelis.accesspolicy.PolicyResponse;
+import be.tiemencelis.accesspolicy.PolicySet;
+import be.tiemencelis.accesspolicy.PolicySetResponse;
+import be.tiemencelis.accesspolicy.RequirementItem;
+import be.tiemencelis.accesspolicy.RequirementItemResponse;
 import be.tiemencelis.beans.ConnectInfo;
 import be.tiemencelis.beans.FileMeta;
+import be.tiemencelis.beans.PolicyResponseRequest;
 
 /**
  * Created by Tiemen on 12-5-2015.
@@ -137,7 +145,8 @@ public class CommunicationHandler {
         conn.send(session);
 
         //TODO PolicyResponseRequest request = (PolicyResponseRequest) conn.receive();
-        //TODO Create answer
+        PolicyResponseRequest request = (PolicyResponseRequest) conn.receive();
+        //TODO Create answer + role proof
         //TODO conn.send(PolicySetResponse)
 
         if (((String) conn.receive()).equals("OK")) {
@@ -148,6 +157,42 @@ public class CommunicationHandler {
         conn.close();
 
         return token;
+    }
+
+
+    private static PolicySetResponse createAnswer(PolicyResponseRequest request) throws Exception {
+        PolicySetResponse result = new PolicySetResponse();
+
+        PolicySet policySet = AccessPolicyParser.parseAccessPolicyXML(request.getAccessPolicy());
+        result.setId(policySet.getId());
+
+        for (Policy policy : policySet.getPolicies()) {
+            PolicyResponse polRes = new PolicyResponse();
+            polRes.setId(policy.getId());
+
+            for (RequirementItem item : policy.getRequirementItems()) {
+                RequirementItemResponse itemRes = new RequirementItemResponse();
+                itemRes.setId(item.getId());
+
+                switch (item.getType()) {
+                    case ("context"):
+                        break;
+                    case ("x509"):
+                        break;
+                    case ("idmx"):
+                        break;
+                    default:
+                        throw new Exception("Unsupported type \"" + item.getType() + "\" in requirementItem");
+                }
+
+                polRes.addItem(itemRes);
+            }
+
+            result.addPolicy(polRes);
+        }
+
+
+        return result;
     }
 
 

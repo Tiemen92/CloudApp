@@ -92,7 +92,7 @@ public class FileBrowserActivity extends AppCompatActivity {
 
 
     /**
-     * Load file content and save it to /sdcard/CloudApp/
+     * Load file content and save it to /sdcard/CloudApp/data/
      */
     class LoadFileContents implements Runnable {
         int position;

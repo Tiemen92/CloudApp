@@ -11,14 +11,9 @@ import android.nfc.Tag;
 import android.nfc.tech.Ndef;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
-import android.widget.Toast;
 
 import java.io.UnsupportedEncodingException;
-import java.util.Arrays;
 
-import be.tiemencelis.cloudapp.R;
 
 public class NfcActivity extends Activity {
     private NfcAdapter mNfcAdapter;
@@ -28,38 +23,8 @@ public class NfcActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        System.out.println("Oncreate functie!!");
-        String action = getIntent().getAction();
-        System.out.println("action");
-        if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)) {
-            System.out.println("ndef!!");
 
-            String type = getIntent().getType();
-            if (MIME_TEXT_PLAIN.equals(type)) {
-
-                Tag tag = getIntent().getParcelableExtra(NfcAdapter.EXTRA_TAG);
-                new NdefReaderTask().execute(tag);
-
-            } else {
-                System.out.println("Wrong mime type");
-            }
-        } else if (NfcAdapter.ACTION_TECH_DISCOVERED.equals(action)) {
-            System.out.println("tech");
-            // In case we would still use the Tech Discovered Intent
-            Tag tag = getIntent().getParcelableExtra(NfcAdapter.EXTRA_TAG);
-            String[] techList = tag.getTechList();
-            String searchedTech = Ndef.class.getName();
-
-            for (String tech : techList) {
-                if (searchedTech.equals(tech)) {
-                    new NdefReaderTask().execute(tag);
-                    break;
-                }
-            }
-        }
-        System.out.println("shit");
-
-
+        handleIntent(getIntent());
         finish();
     }
 
@@ -98,7 +63,32 @@ public class NfcActivity extends Activity {
     }
 
     private void handleIntent(Intent intent) {
-        // TODO: handle Intent
+        String action = getIntent().getAction();
+        if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)) {
+
+            String type = getIntent().getType();
+            if (MIME_TEXT_PLAIN.equals(type)) {
+
+                Tag tag = getIntent().getParcelableExtra(NfcAdapter.EXTRA_TAG);
+                new NdefReaderTask().execute(tag);
+
+            } else {
+                System.out.println("Wrong mime type");
+            }
+        } else if (NfcAdapter.ACTION_TECH_DISCOVERED.equals(action)) {
+
+            // In case we would still use the Tech Discovered Intent
+            Tag tag = getIntent().getParcelableExtra(NfcAdapter.EXTRA_TAG);
+            String[] techList = tag.getTechList();
+            String searchedTech = Ndef.class.getName();
+
+            for (String tech : techList) {
+                if (searchedTech.equals(tech)) {
+                    new NdefReaderTask().execute(tag);
+                    break;
+                }
+            }
+        }
     }
 
     /**
@@ -152,17 +142,13 @@ public class NfcActivity extends Activity {
             NdefMessage ndefMessage = ndef.getCachedNdefMessage();
 
             NdefRecord[] records = ndefMessage.getRecords();
-            System.out.println("records size: " + records.length);
             for (NdefRecord ndefRecord : records) {
-                //if (ndefRecord.getTnf() == NdefRecord.TNF_WELL_KNOWN && Arrays.equals(ndefRecord.getType(), NdefRecord.RTD_TEXT)) {
-                    try {
-                        return readText(ndefRecord);
-                    } catch (UnsupportedEncodingException e) {
-                        System.out.println("Unsupported Encoding");
-                    }
-                //}
+                try {
+                    return readText(ndefRecord);
+                } catch (UnsupportedEncodingException e) {
+                    System.out.println("Unsupported NFC encoding");
+                }
             }
-            System.out.println("shit2");
             return null;
         }
 
@@ -188,22 +174,13 @@ public class NfcActivity extends Activity {
                 textEncoding = "UTF-16";
             }
 
-            // Get the Language Code
-            //int languageCodeLength = payload[0] & 0063;
-
-            // String languageCode = new String(payload, 1, languageCodeLength, "US-ASCII");
-            // e.g. "en"
-
-            // Get the Text
-            String uitvoer = new String(payload, textEncoding);
-            System.out.println("Uitvoer: " + uitvoer);
-            return uitvoer;
+            return new String(payload, textEncoding);
         }
 
         @Override
         protected void onPostExecute(String result) {
             if (result != null) {
-                System.out.println("Read content: " + result);
+                System.out.println("Read nfc content: " + result);
                 ContextManager.addLastNFCTags(System.currentTimeMillis(), result);
             }
         }

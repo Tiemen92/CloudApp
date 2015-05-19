@@ -144,7 +144,7 @@ public class ContextManager extends BroadcastReceiver {
     public static long getNtpTime(long maxAge) throws Exception {
         long ntpTime;
 
-        if (lastNtpTime > System.currentTimeMillis() - maxAge) {
+        if (maxAge == 0 || (lastNtpTime > System.currentTimeMillis() - maxAge)) {
             return lastNtpTime;
         }
 
@@ -192,6 +192,8 @@ public class ContextManager extends BroadcastReceiver {
         System.out.println("Time: " + time + " Tag: " + tag);
         ContextManager.lastNFCTags.put(time, tag);
     }
+
+    //TODO getallnfctags en getvalignfctags (age in ms) <- 0 is alles geven!
 
     /**
      * Listener for changes of the wifi connection. SHOULD NOT BE CALLED!
