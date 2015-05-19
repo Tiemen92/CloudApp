@@ -63,13 +63,13 @@ public class NfcActivity extends Activity {
     }
 
     private void handleIntent(Intent intent) {
-        String action = getIntent().getAction();
+        String action = intent.getAction();
         if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)) {
 
-            String type = getIntent().getType();
+            String type = intent.getType();
             if (MIME_TEXT_PLAIN.equals(type)) {
 
-                Tag tag = getIntent().getParcelableExtra(NfcAdapter.EXTRA_TAG);
+                Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
                 new NdefReaderTask().execute(tag);
 
             } else {
@@ -78,7 +78,7 @@ public class NfcActivity extends Activity {
         } else if (NfcAdapter.ACTION_TECH_DISCOVERED.equals(action)) {
 
             // In case we would still use the Tech Discovered Intent
-            Tag tag = getIntent().getParcelableExtra(NfcAdapter.EXTRA_TAG);
+            Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
             String[] techList = tag.getTechList();
             String searchedTech = Ndef.class.getName();
 
