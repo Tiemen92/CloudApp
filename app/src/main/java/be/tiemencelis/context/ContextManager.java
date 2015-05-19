@@ -14,21 +14,16 @@ import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.telephony.NeighboringCellInfo;
 import android.telephony.TelephonyManager;
-import android.telephony.cdma.CdmaCellLocation;
 import android.telephony.gsm.GsmCellLocation;
 
-import org.apache.commons.net.ntp.TimeStamp;
-import org.joda.time.DateTime;
-
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-import be.kuleuven.cs.priman.manager.ConnectionManager;
 
 /**
  * Created by Tiemen on 18-5-2015.
@@ -52,6 +47,7 @@ public class ContextManager extends BroadcastReceiver {
     private static Map<Long, String> lastNFCTags;
 
     private static long lastNtpTime = 0;
+    //TODO cellid
 
 
     /**
@@ -73,7 +69,7 @@ public class ContextManager extends BroadcastReceiver {
         }
 
         /*Start listener for location updates*/
-        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000*30, 0, locationListener);
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000 * 30, 0, locationListener);
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000*60, 0, locationListener);
 
         /*Request current wifi information*/
@@ -165,7 +161,7 @@ public class ContextManager extends BroadcastReceiver {
      * Get the connected wifi connection info
      * @return WifiInfo is current connection
      */
-    public WifiInfo getCurrentWifiConnection() {
+    public static WifiInfo getCurrentWifiConnection() {
         return currentWifiConnection;
     }
 
@@ -174,7 +170,7 @@ public class ContextManager extends BroadcastReceiver {
      * Get a list of all configured wifi networks of the device
      * @return List of WifiConfiguration objects
      */
-    public List<WifiConfiguration> getConfiguredWifi() {
+    public static List<WifiConfiguration> getConfiguredWifi() {
         return wifiManager.getConfiguredNetworks();
     }
 
@@ -183,22 +179,56 @@ public class ContextManager extends BroadcastReceiver {
      * Get a set of all the connected bluetooth devices.
      * @return Set of BluetoothDevice objects
      */
-    public Set<BluetoothDevice> getConnectedBluetoothDevices() {
+    public static Set<BluetoothDevice> getConnectedBluetoothDevices() {
         return connectedBluetoothDevices;
     }
 
 
+    /**
+     * Add detected nfc tag and time to gathered tags
+     * @param time time of detection
+     * @param tag contents as string
+     */
     public static void addLastNFCTags(long time, String tag) {
         System.out.println("Time: " + time + " Tag: " + tag);
         ContextManager.lastNFCTags.put(time, tag);
     }
 
+
+    /**
+     * Get all detected NFC tags
+     * @return
+     */
+    public static Map<Long, String> getLastNFCTags() {
+        return lastNFCTags;
+    }
+
+
+    /**
+     * Get all detected NFC tags which are not older than the specified age
+     * @param age max age in milliseconds
+     * @return detected nfc tags with discovertime which are not too old
+     */
+    public static Map<Long, String> getValidLastNFCTags(long age) {
+        Map<Long, String> result = new HashMap<>();
+        long minimumTime = System.currentTimeMillis() - age;
+
+        for (Map.Entry<Long, String> tag : lastNFCTags.entrySet()) {
+            if (age == 0 || (tag.getKey() > minimumTime)) {
+                result.put(tag.getKey(), tag.getValue());
+            }
+        }
+
+        return result;
+    }
+
+
     //TODO getallnfctags en getvalignfctags (age in ms) <- 0 is alles geven!
 
     /**
      * Listener for changes of the wifi connection. SHOULD NOT BE CALLED!
-     * @param context
-     * @param intent
+     * @param context current context
+     * @param intent intent containing the action
      */
     @Override
     public void onReceive(Context context, Intent intent) {

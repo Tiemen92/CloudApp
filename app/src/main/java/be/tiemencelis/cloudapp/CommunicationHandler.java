@@ -1,9 +1,14 @@
 package be.tiemencelis.cloudapp;
 
+import android.bluetooth.BluetoothDevice;
+import android.location.Location;
+import android.net.wifi.WifiInfo;
+
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import be.kuleuven.cs.priman.Priman;
@@ -19,6 +24,7 @@ import be.tiemencelis.accesspolicy.RequirementItemResponse;
 import be.tiemencelis.beans.ConnectInfo;
 import be.tiemencelis.beans.FileMeta;
 import be.tiemencelis.beans.PolicyResponseRequest;
+import be.tiemencelis.context.ContextManager;
 
 /**
  * Created by Tiemen on 12-5-2015.
@@ -145,7 +151,7 @@ public class CommunicationHandler {
         conn.send(session);
 
         //TODO PolicyResponseRequest request = (PolicyResponseRequest) conn.receive();
-        PolicyResponseRequest request = (PolicyResponseRequest) conn.receive();
+        //PolicyResponseRequest request = (PolicyResponseRequest) conn.receive();
         //TODO Create answer + role proof
         //TODO conn.send(PolicySetResponse)
 
@@ -163,36 +169,130 @@ public class CommunicationHandler {
     private static PolicySetResponse createAnswer(PolicyResponseRequest request) throws Exception {
         PolicySetResponse result = new PolicySetResponse();
 
-        PolicySet policySet = AccessPolicyParser.parseAccessPolicyXML(request.getAccessPolicy());
+        PolicySet policySet = request.getAccessPolicy();
         result.setId(policySet.getId());
 
         for (Policy policy : policySet.getPolicies()) {
             PolicyResponse polRes = new PolicyResponse();
-            polRes.setId(policy.getId());
+            long age = policy.getAgeInMilliseconds();
 
             for (RequirementItem item : policy.getRequirementItems()) {
-                RequirementItemResponse itemRes = new RequirementItemResponse();
-                itemRes.setId(item.getId());
+                RequirementItemResponse itemRes = null;
 
                 switch (item.getType()) {
-                    case ("context"):
+                    case "context":
+                        itemRes = handleContext(age, item);
                         break;
-                    case ("x509"):
+                    case "x509":
+                        itemRes = handleX509(request.getCredentialPolicies().get(item.getId()));
                         break;
-                    case ("idmx"):
+                    case "idmx":
+                        itemRes = handleIdemix(request.getCredentialPolicies().get(item.getId()));
                         break;
                     default:
-                        throw new Exception("Unsupported type \"" + item.getType() + "\" in requirementItem");
+                        System.out.println("Unsupported type \"" + item.getType() + "\" in requirementItem");
+                        continue;
                 }
 
-                polRes.addItem(itemRes);
+                if (itemRes != null) {
+                    itemRes.setId(item.getId());
+                    polRes.addItem(itemRes);
+                }
             }
 
-            result.addPolicy(polRes);
+            if (!polRes.getItems().isEmpty()) {
+                polRes.setId(policy.getId());
+                result.addPolicy(polRes);
+            }
         }
 
-
         return result;
+    }
+
+
+    private static RequirementItemResponse handleContext(long age, RequirementItem item) {
+        RequirementItemResponse response = new RequirementItemResponse();
+
+        try {
+            switch (item.getData().getDataType()) {
+                case "location":
+                    if (item.getOperation().getName().equals("equals-cell-id")) {
+                        int cid = ContextManager.getCellId();
+                        if (cid == -1) {
+                            return null;
+                        }
+                        response.addValue(Integer.toString(cid));
+                    }
+                    else {
+                        Location loc = ContextManager.getLocation();
+                        if (loc == null) {
+                            return null;
+                        }
+                        response.addValue(loc.getLatitude() + "," + loc.getLongitude() + ":" + loc.getTime());
+                    }
+                    break;
+                case "ntp":
+                    if (item.getData().getMinTrust() > 1) {
+                        response.addValue(Long.toString(ContextManager.getNtpTime(age)));
+                    } else {
+                        response.addValue(Long.toString(ContextManager.getSystemTime()));
+                    }
+                    break;
+                case "connected-wlan":
+                    WifiInfo wifi = ContextManager.getCurrentWifiConnection();
+                    if (wifi == null) {
+                        return null;
+                    }
+                    response.addValue(wifi.getSSID() + ":" + ContextManager.getSystemTime());
+                    break;
+                case "paired-bluetooth":
+                    Set<BluetoothDevice> devices = ContextManager.getConnectedBluetoothDevices();
+                    if (devices == null || devices.isEmpty()) {
+                        return null;
+                    }
+                    long time = ContextManager.getSystemTime();
+                    for (BluetoothDevice device : devices) {
+                        response.addValue(device.getName() + ":" + time);
+                    }
+                    break;
+                case "nfc-id":
+                    Map<Long, String> tags = ContextManager.getValidLastNFCTags(age);
+                    for(Map.Entry<Long, String> tag : tags.entrySet()) {
+                        response.addValue(tag.getValue() + ":" + tag.getKey());
+                    }
+                    break;
+                case "user-role-nearby-wlan":
+                    //TODO
+                    break;
+                default:
+                    System.out.println("Unsupported context type \"" + item.getData().getDataType() + "\" in RequirementData");
+                    return null;
+            }
+        } catch (Exception e) {
+            System.out.println("Exception when gathering context");
+            e.printStackTrace();
+            return null;
+        }
+
+        return response;
+    }
+
+
+    private static RequirementItemResponse handleX509(String credential /*, Nonce nonce*/) { //TODO nonce
+        RequirementItemResponse response = null;
+
+
+
+        return response;
+    }
+
+
+    private static RequirementItemResponse handleIdemix(String credential /*, Nonce nonce*/) { //TODO nonce
+        RequirementItemResponse response = null;
+
+
+
+        return response;
     }
 
 

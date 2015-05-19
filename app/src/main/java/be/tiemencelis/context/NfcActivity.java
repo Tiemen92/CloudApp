@@ -11,6 +11,7 @@ import android.nfc.Tag;
 import android.nfc.tech.Ndef;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.widget.Toast;
 
 import java.io.UnsupportedEncodingException;
 
@@ -88,6 +89,8 @@ public class NfcActivity extends Activity {
                     break;
                 }
             }
+        } else {
+            Toast.makeText(getApplicationContext(), "NFC tag not supported", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -136,6 +139,7 @@ public class NfcActivity extends Activity {
             if (ndef == null) {
                 // NDEF is not supported by this Tag.
                 System.out.println("NDEF is not supported by this tag");
+                Toast.makeText(getApplicationContext(), "NFC tag not supported", Toast.LENGTH_SHORT).show();
                 return null;
             }
 
@@ -147,8 +151,10 @@ public class NfcActivity extends Activity {
                     return readText(ndefRecord);
                 } catch (UnsupportedEncodingException e) {
                     System.out.println("Unsupported NFC encoding");
+                    Toast.makeText(getApplicationContext(), "NFC tag not supported", Toast.LENGTH_SHORT).show();
                 }
             }
+            Toast.makeText(getApplicationContext(), "NFC tag not supported", Toast.LENGTH_SHORT).show();
             return null;
         }
 
@@ -182,6 +188,8 @@ public class NfcActivity extends Activity {
             if (result != null) {
                 System.out.println("Read nfc content: " + result);
                 ContextManager.addLastNFCTags(System.currentTimeMillis(), result);
+            } else {
+                Toast.makeText(getApplicationContext(), "NFC tag not supported", Toast.LENGTH_SHORT).show();
             }
         }
     }
