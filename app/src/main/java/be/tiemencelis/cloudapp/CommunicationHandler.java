@@ -39,7 +39,6 @@ public class CommunicationHandler {
     @SuppressWarnings("unchecked")
     public static ArrayList<FileMeta> requestDirectoryContents(String role, String location) throws Exception {
         ArrayList<FileMeta> result = null;
-        //FileMeta meta;
 
         Connection conn = Priman.getInstance().getConnectionManager().getConnection(cloudParam);
 
@@ -54,7 +53,6 @@ public class CommunicationHandler {
         switch ((String) conn.receive()) {
             case "OK":
                 System.out.println("Token valid: receiving contents");
-                //meta = (FileMeta) conn.receive(); TODO momenteel niet nodig
                 result = (ArrayList<FileMeta>) conn.receive();
                 conn.close();
                 break;
@@ -221,7 +219,7 @@ public class CommunicationHandler {
                         if (cid == -1) {
                             return null;
                         }
-                        response.addValue(Integer.toString(cid));
+                        response.addValue(Integer.toString(cid) + ":" + System.currentTimeMillis());
                     }
                     else {
                         Location loc = ContextManager.getLocation();
