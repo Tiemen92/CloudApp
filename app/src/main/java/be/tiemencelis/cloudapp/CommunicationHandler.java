@@ -149,8 +149,9 @@ public class CommunicationHandler {
         conn.send(session);
 
         //TODO PolicyResponseRequest request = (PolicyResponseRequest) conn.receive();
-        //PolicyResponseRequest request = (PolicyResponseRequest) conn.receive();
+        PolicyResponseRequest request = (PolicyResponseRequest) conn.receive();
         //TODO Create answer + role proof
+        PolicySetResponse resp = createAnswer(request);
         //TODO conn.send(PolicySetResponse)
 
         if (((String) conn.receive()).equals("OK")) {
