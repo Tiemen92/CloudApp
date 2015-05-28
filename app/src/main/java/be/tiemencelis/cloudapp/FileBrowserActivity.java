@@ -35,7 +35,7 @@ public class FileBrowserActivity extends AppCompatActivity {
         location = b.getString("location");
         role = b.getString("role");
         files = (ArrayList<FileMeta>) b.getSerializable("files");
-        setTitle("File browser: " + location); //TODO enkel mapnaam zetten, of scrollen?
+        setTitle("File browser: " + location);
 
         ListView list = (ListView) findViewById(R.id.list);
         list.setAdapter(new CustomListAdapter(this, files));

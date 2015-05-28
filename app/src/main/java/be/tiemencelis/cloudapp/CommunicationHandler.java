@@ -144,15 +144,12 @@ public class CommunicationHandler {
         Connection conn = Priman.getInstance().getConnectionManager().getConnection(verificationParam);
 
         conn.send("AUTHENTICATE");
-        conn.send(role);
+        conn.send(role); //TODO proof ook zenden
         conn.send(action);
         conn.send(session);
 
-        //TODO PolicyResponseRequest request = (PolicyResponseRequest) conn.receive();
         PolicyResponseRequest request = (PolicyResponseRequest) conn.receive();
-        //TODO Create answer + role proof
         PolicySetResponse resp = createAnswer(request);
-        //TODO conn.send(PolicySetResponse)
         conn.send(resp);
 
         if (((String) conn.receive()).equals("OK")) {
@@ -252,7 +249,7 @@ public class CommunicationHandler {
                     }
                     long time = ContextManager.getSystemTime();
                     for (BluetoothDevice device : devices) {
-                        response.addValue(device.getName() + ":" + time);
+                        response.addValue(device.getAddress() + ":" + time);
                     }
                     break;
                 case "nfc-id":

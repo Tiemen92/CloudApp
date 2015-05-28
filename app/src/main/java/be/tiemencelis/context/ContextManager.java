@@ -16,14 +16,11 @@ import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.telephony.TelephonyManager;
 import android.telephony.gsm.GsmCellLocation;
-import android.util.Log;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 
 /**
@@ -69,29 +66,9 @@ public class ContextManager extends BroadcastReceiver {
             lastLocation = networkLocation;
         }
 
-        /**
-         * Listener for location updates
-         */
-        LocationListener locationListener = new LocationListener() {
-            public void onLocationChanged(Location location) {
-                if (isBetterLocation(location, lastLocation)) {
-                    lastLocation = location;
-                    System.out.println("New location (better): " + location.toString());
-                }
-                else
-                    System.out.println("New location (worse): " + location.toString());
-            }
-
-            public void onStatusChanged(String provider, int status, Bundle extras) {}
-
-            public void onProviderEnabled(String provider) {}
-
-            public void onProviderDisabled(String provider) {}
-        };
-
         /*Start listener for location updates*/
-        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000 * 5, 0, locationListener);
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000*10, 0, locationListener);
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000 * 30, 0, locationListener);
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000*60, 0, locationListener);
 
         /*Request current wifi information*/
         wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
@@ -105,7 +82,7 @@ public class ContextManager extends BroadcastReceiver {
         connectedBluetoothDevices = bluetoothManager.getAdapter().getBondedDevices();
         System.out.println("Connected bluetooth devices: ");
         for (BluetoothDevice dev : connectedBluetoothDevices) {
-            System.out.println("Device: " + dev.getName());
+            System.out.println("Device: " + dev.getName() + ", " + dev.getAddress());
         }
 
         lastNFCTags = new HashMap<Long, String>();
@@ -151,7 +128,6 @@ public class ContextManager extends BroadcastReceiver {
     }
 
 
-    /*TODO threaded, meerdere ip's proberen?, volledige classe threaded en maar 1 keer! (oncreate komt altijd opnieuw bij scherm wijziging)*/
     /**
      * Get a ntp timestamp which is not older than the specified age (based on system time)
      * @param maxAge maximum age in milliseconds!
@@ -231,11 +207,15 @@ public class ContextManager extends BroadcastReceiver {
      * @return detected nfc tags with discovertime which are not too old
      */
     public static Map<Long, String> getValidLastNFCTags(long age) {
+        if (age == 0) {
+            return lastNFCTags;
+        }
+
         Map<Long, String> result = new HashMap<>();
         long minimumTime = System.currentTimeMillis() - age;
 
         for (Map.Entry<Long, String> tag : lastNFCTags.entrySet()) {
-            if (age == 0 || (tag.getKey() > minimumTime)) {
+            if (tag.getKey() > minimumTime) {
                 result.put(tag.getKey(), tag.getValue());
             }
         }
@@ -263,7 +243,25 @@ public class ContextManager extends BroadcastReceiver {
     }
 
 
+    /**
+     * Listener for location updates
+     */
+    private static LocationListener locationListener = new LocationListener() {
+        public void onLocationChanged(Location location) {
+            if (isBetterLocation(location, lastLocation)) {
+                lastLocation = location;
+                System.out.println("New location (better): " + location.toString());
+            }
+            else
+                System.out.println("New location (worse): " + location.toString());
+        }
 
+        public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+        public void onProviderEnabled(String provider) {}
+
+        public void onProviderDisabled(String provider) {}
+    };
 
 
     /**
