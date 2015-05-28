@@ -77,7 +77,7 @@ public class FileBrowserActivity extends AppCompatActivity {
             }
 
             if (newFiles == null) {
-                Toast.makeText(getApplicationContext(), "Authentication failed", Toast.LENGTH_LONG).show();
+                showToast("Authentication failed");
             } else {
                 b = new Bundle();
                 b.putString("location", location + files.get(position).getName() + "/");
@@ -104,7 +104,7 @@ public class FileBrowserActivity extends AppCompatActivity {
                 content = CommunicationHandler.requestFileContents(role, location + files.get(position).getName());
 
                 if (content == null) {
-                    Toast.makeText(getApplicationContext(), "Authentication failed", Toast.LENGTH_LONG).show();
+                    showToast("Authentication failed");
                 } else {
                     BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream("/sdcard/CloudApp/data/" + files.get(position).getName()));
                     bos.write(content);
@@ -137,6 +137,16 @@ public class FileBrowserActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
+    }
+
+
+    public void showToast(final String toast) {
+        runOnUiThread(new Runnable() {
+            public void run()
+            {
+                Toast.makeText(FileBrowserActivity.this, toast, Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
 

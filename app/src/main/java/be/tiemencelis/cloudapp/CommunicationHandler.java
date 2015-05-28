@@ -153,6 +153,7 @@ public class CommunicationHandler {
         //TODO Create answer + role proof
         PolicySetResponse resp = createAnswer(request);
         //TODO conn.send(PolicySetResponse)
+        conn.send(resp);
 
         if (((String) conn.receive()).equals("OK")) {
             token = (Map<String, byte[]>) conn.receive();

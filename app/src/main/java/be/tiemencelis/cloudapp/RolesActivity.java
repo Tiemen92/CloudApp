@@ -68,7 +68,7 @@ public class RolesActivity extends AppCompatActivity {
                                 }
 
                                 if (files == null) {
-                                    Toast.makeText(getApplicationContext(), "Authentication failed", Toast.LENGTH_LONG).show();
+                                    showToast("Authentication failed");
                                 } else {
                                     b = new Bundle();
                                     b.putString("location", "/");
@@ -127,6 +127,16 @@ public class RolesActivity extends AppCompatActivity {
             }
         });
 
+    }
+
+
+    public void showToast(final String toast) {
+        runOnUiThread(new Runnable() {
+            public void run()
+            {
+                Toast.makeText(RolesActivity.this, toast, Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
 
