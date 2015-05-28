@@ -16,6 +16,7 @@ import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.telephony.TelephonyManager;
 import android.telephony.gsm.GsmCellLocation;
+import android.util.Log;
 
 import java.util.HashMap;
 import java.util.List;
@@ -68,9 +69,29 @@ public class ContextManager extends BroadcastReceiver {
             lastLocation = networkLocation;
         }
 
+        /**
+         * Listener for location updates
+         */
+        LocationListener locationListener = new LocationListener() {
+            public void onLocationChanged(Location location) {
+                if (isBetterLocation(location, lastLocation)) {
+                    lastLocation = location;
+                    System.out.println("New location (better): " + location.toString());
+                }
+                else
+                    System.out.println("New location (worse): " + location.toString());
+            }
+
+            public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+            public void onProviderEnabled(String provider) {}
+
+            public void onProviderDisabled(String provider) {}
+        };
+
         /*Start listener for location updates*/
-        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000 * 30, 0, locationListener);
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000*60, 0, locationListener);
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000 * 5, 0, locationListener);
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000*10, 0, locationListener);
 
         /*Request current wifi information*/
         wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
@@ -223,8 +244,6 @@ public class ContextManager extends BroadcastReceiver {
     }
 
 
-    //TODO getallnfctags en getvalignfctags (age in ms) <- 0 is alles geven!
-
     /**
      * Listener for changes of the wifi connection. SHOULD NOT BE CALLED!
      * @param context current context
@@ -244,25 +263,7 @@ public class ContextManager extends BroadcastReceiver {
     }
 
 
-    /**
-     * Listener for location updates
-     */
-    private static LocationListener locationListener = new LocationListener() {
-        public void onLocationChanged(Location location) {
-            if (isBetterLocation(location, lastLocation)) {
-                lastLocation = location;
-                System.out.println("New location (better): " + location.toString());
-            }
-            else
-                System.out.println("New location (worse): " + location.toString());
-        }
 
-        public void onStatusChanged(String provider, int status, Bundle extras) {}
-
-        public void onProviderEnabled(String provider) {}
-
-        public void onProviderDisabled(String provider) {}
-    };
 
 
     /**
