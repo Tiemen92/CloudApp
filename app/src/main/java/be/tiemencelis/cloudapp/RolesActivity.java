@@ -127,7 +127,7 @@ public class RolesActivity extends AppCompatActivity {
                         .setView(layout)
                         .setPositiveButton("Create", new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int which) {
-                                requestCredential(input.getEditableText().toString());
+                                createAccount(input.getEditableText().toString());
                             }
                         })
                         .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -189,11 +189,11 @@ public class RolesActivity extends AppCompatActivity {
     }
 
 
-    public void requestCredential(final String name) {
+    public void createAccount(final String name) {
         (new Runnable() {
             public void run() {
                 try {
-                    if (CommunicationHandler.requestCredential(name)) {
+                    if (CommunicationHandler.createAccount(name)) {
                         showToast("Account successfully created");
                     }
                     else {

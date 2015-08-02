@@ -52,7 +52,7 @@ public class CommunicationHandler {
     private static final SSLParameters caParam = pman.load(home.resolve("app_data/caConnection-ssl.param"));
 
 
-    public static boolean requestCredential(String role) throws Exception {
+    public static boolean createAccount(String role) throws Exception {
         Connection conn = cman.getConnection(cloudParam);
 
         /*Start request create account*/
