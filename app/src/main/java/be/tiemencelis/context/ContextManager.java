@@ -14,18 +14,23 @@ import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.telephony.CellLocation;
 import android.telephony.TelephonyManager;
+import android.telephony.cdma.CdmaCellLocation;
 import android.telephony.gsm.GsmCellLocation;
 
+import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import be.tiemencelis.beans.AuthToken;
+
 
 /**
  * Created by Tiemen on 18-5-2015.
- * Provides interface for requesting all kinds of contextinformation
+ * Provides interface for requesting all kinds of contextinformation and saved tokens
  * Also stores cached contextinformation for improved speed and battery consumption
  */
 
@@ -33,7 +38,6 @@ public class ContextManager extends BroadcastReceiver {
     private static final int FIVE_MINUTES = 1000 * 60 * 5;
 
     private static Context context;
-    private static LocationManager locationManager;
     private static Location lastLocation = null;
 
     private static WifiManager wifiManager;
@@ -45,18 +49,19 @@ public class ContextManager extends BroadcastReceiver {
     private static Map<Long, String> lastNFCTags;
 
     private static long lastNtpTime = 0;
-    //TODO cellid
+
+    private static Map<Map.Entry<String, String>, AuthToken> tokens;
 
 
     /**
      * Initialise all context types and listeners
-     * @param context
+     * @param context context
      */
     public static void init(Context context) {
         ContextManager.context = context;
 
         /*Request last known and best location as init value*/
-        locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+        LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
         Location networkLocation = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
         Location gpsLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
         if (isBetterLocation(gpsLocation, networkLocation)) {
@@ -85,7 +90,8 @@ public class ContextManager extends BroadcastReceiver {
             System.out.println("Device: " + dev.getName() + ", " + dev.getAddress());
         }
 
-        lastNFCTags = new HashMap<Long, String>();
+        lastNFCTags = new HashMap<>();
+        tokens = new HashMap<>();
 
         /*Request ntp time as init value*/
         try {
@@ -111,9 +117,15 @@ public class ContextManager extends BroadcastReceiver {
      */
     public static int getCellId() {
         TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
-        GsmCellLocation cellLocation = (GsmCellLocation) telephonyManager.getCellLocation();
-        int cid = cellLocation.getCid();
-        System.out.println("GSM cid: " + cid);
+        CellLocation loc = telephonyManager.getCellLocation();
+        int cid = 0;
+        if (loc instanceof GsmCellLocation) {
+            cid = ((GsmCellLocation) telephonyManager.getCellLocation()).getCid();
+            System.out.println("GSM cid: " + cid);
+        } else if (loc instanceof CdmaCellLocation) {
+            cid = ((CdmaCellLocation) telephonyManager.getCellLocation()).getBaseStationId();
+            System.out.println("CDMA cid: " + cid);
+        }
 
         return cid;
     }
@@ -135,8 +147,6 @@ public class ContextManager extends BroadcastReceiver {
      * @throws Exception when ntp request failed
      */
     public static long getNtpTime(long maxAge) throws Exception {
-        long ntpTime;
-
         if (maxAge == 0 || (lastNtpTime > System.currentTimeMillis() - maxAge)) {
             return lastNtpTime;
         }
@@ -194,7 +204,7 @@ public class ContextManager extends BroadcastReceiver {
 
     /**
      * Get all detected NFC tags
-     * @return
+     * @return Map with all detected NFC tags
      */
     public static Map<Long, String> getLastNFCTags() {
         return lastNFCTags;
@@ -221,6 +231,56 @@ public class ContextManager extends BroadcastReceiver {
         }
 
         return result;
+    }
+
+
+    /**
+     * Add token
+     * @param absPath role + rel path of file
+     * @param action read or write rights
+     * @param token token
+     */
+    public static void addToken(String absPath, String action, AuthToken token) {
+        Map.Entry<String, String> entry = new AbstractMap.SimpleEntry<>(absPath, action);
+        /*If action is write, check if there exists an identical token for read rights and remove it*/
+        if (action.equals("w")) {
+            Map.Entry<String, String> entry2 = new AbstractMap.SimpleEntry<>(absPath, "r");
+            if (tokens.get(entry2) != null) {
+                tokens.remove(entry2);
+            }
+        }
+        tokens.put(entry, token);
+    }
+
+
+    public static AuthToken getToken(String role, String relPath, String action) {
+        Map.Entry<String, String> entry = new AbstractMap.SimpleEntry<>(role + relPath, action);
+
+        AuthToken token = tokens.get(entry);
+        /*A matching token is found*/
+        if (token != null) {
+            /*Token is expired, remove it and set null as return value*/
+            if (token.getValidUntil() < getSystemTime()) {
+                System.out.println("Removing expired token");
+                tokens.remove(entry);
+                token = null;
+            }
+        }
+        /*No token found, search for token with write action if requested action is read*/
+        else if (action.equals("r")) {
+            entry.setValue("w");
+            token = tokens.get(entry);
+            if (token != null) {
+            /*Token is expired, remove it and set null as return value*/
+                if (token.getValidUntil() < getSystemTime()) {
+                    System.out.println("Removing expired token");
+                    tokens.remove(entry);
+                    token = null;
+                }
+            }
+        }
+
+        return token;
     }
 
 

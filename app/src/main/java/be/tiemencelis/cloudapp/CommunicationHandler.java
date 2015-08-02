@@ -7,20 +7,30 @@ import android.net.wifi.WifiInfo;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import be.kuleuven.cs.priman.Priman;
 import be.kuleuven.cs.priman.connection.Connection;
+import be.kuleuven.cs.priman.credential.Credential;
+import be.kuleuven.cs.priman.credential.issuance.IssuanceSpecification;
+import be.kuleuven.cs.priman.credential.proof.Nonce;
+import be.kuleuven.cs.priman.credential.proof.Proof;
+import be.kuleuven.cs.priman.manager.ConnectionManager;
+import be.kuleuven.cs.priman.manager.CredentialManager;
+import be.kuleuven.cs.priman.manager.PersistenceManager;
+import be.kuleuven.cs.priman.manager.ServerPolicyManager;
 import be.kuleuven.cs.primanprovider.connection.ssl.SSLParameters;
-import be.tiemencelis.accesspolicy.AccessPolicyParser;
 import be.tiemencelis.accesspolicy.Policy;
 import be.tiemencelis.accesspolicy.PolicyResponse;
 import be.tiemencelis.accesspolicy.PolicySet;
 import be.tiemencelis.accesspolicy.PolicySetResponse;
 import be.tiemencelis.accesspolicy.RequirementItem;
 import be.tiemencelis.accesspolicy.RequirementItemResponse;
+import be.tiemencelis.beans.AuthToken;
 import be.tiemencelis.beans.ConnectInfo;
 import be.tiemencelis.beans.FileMeta;
 import be.tiemencelis.beans.PolicyResponseRequest;
@@ -31,21 +41,84 @@ import be.tiemencelis.context.ContextManager;
  *
  */
 public class CommunicationHandler {
+    private static final Priman priman = Priman.getInstance();
+    private static PersistenceManager pman = priman.getPersistenceManager();
+    private static ServerPolicyManager spman = priman.getServerPolicyManager();
+    private static ConnectionManager cman = priman.getConnectionManager();
+    private static CredentialManager credman = priman.getCredentialManager();
     private static final URI home = (new File("/sdcard/CloudApp/")).toURI();
-    private static final SSLParameters cloudParam = Priman.getInstance().getPersistenceManager().load(home.resolve("cloudConnection-ssl.param"));
-    private static final SSLParameters verificationParam = Priman.getInstance().getPersistenceManager().load(home.resolve("verificationConnection-ssl.param"));
+    private static final SSLParameters cloudParam = pman.load(home.resolve("app_data/cloudConnection-ssl.param"));
+    private static final SSLParameters verificationParam = pman.load(home.resolve("app_data/verificationConnection-ssl.param"));
+    private static final SSLParameters caParam = pman.load(home.resolve("app_data/caConnection-ssl.param"));
+
+
+    public static boolean requestCredential(String role) throws Exception {
+        Connection conn = cman.getConnection(cloudParam);
+
+        /*Start request create account*/
+        conn.send("CREATE_ACCOUNT");
+        conn.send(role);
+        /*Rol already exists, cancel*/
+        if (!((String) conn.receive()).equals("OK")) {
+            conn.close();
+            return false;
+        }
+
+        /*Request credential for provided role name at the CA*/
+        try {
+            Connection conn2 = cman.getConnection(caParam);
+            IssuanceSpecification ispec = pman.load(home.resolve("app_data/idmxIssuanceSpecification.xml"));
+            Map<String, String> values = new HashMap<>();
+            values.put("Name", role);
+            ispec.setValues(values);
+            //SEND IT TO THE ISSUER
+            conn2.send(ispec.getRequestForIssuer());
+            //INITIATE THE ISSUING PROTOCOL
+            Credential cred = credman.getIssuedCredential(conn2, ispec);
+            pman.store(cred, home.resolve("credentials/cred_user_" + role + ".xml"));
+            pman.store(cred.getSecret(), home.resolve("credentials/secret_" + role + ".xml"));
+            conn2.close();
+        }
+        /*Requesting credential failed, cancel protocol*/
+        catch (Exception e) {
+            conn.send("NOK");
+            conn.close();
+            return false;
+        }
+
+        /*Credential successfully obtained*/
+        conn.send("OK");
+        /*Creation of account failed, cancel protocol and remove credential*/
+        if (!((String) conn.receive()).equals("OK")) {
+            File credential = new File(home.resolve("credentials/cred_user_" + role + ".xml"));
+            credential.delete();
+            credential = new File(home.resolve("credentials/secret_" + role + ".xml"));
+            credential.delete();
+            conn.close();
+            return false;
+        }
+        /*Account successfully created*/
+        return true;
+    }
 
 
     @SuppressWarnings("unchecked")
     public static ArrayList<FileMeta> requestDirectoryContents(String role, String location) throws Exception {
         ArrayList<FileMeta> result = null;
 
-        Connection conn = Priman.getInstance().getConnectionManager().getConnection(cloudParam);
+        Connection conn = cman.getConnection(cloudParam);
 
         ConnectInfo info = new ConnectInfo();
         info.setAction("r");
         info.setRel_location(location);
         info.setRole(role);
+        AuthToken saved = ContextManager.getToken(role, location, "r");
+        if (saved != null) {
+            System.out.println("Reusing saved token");
+            info.setAuthToken(saved);
+        } else {
+            System.out.println("No token found, requesting without one");
+        }
 
         conn.send("REQUEST_FILE");
         conn.send(info);
@@ -61,10 +134,11 @@ public class CommunicationHandler {
                 UUID session = (UUID) conn.receive();
                 conn.close();
 
-                Map<String, byte[]> token = getToken(role, "r", session);
+                AuthToken token = getToken(role, "r", session);
                 if (token != null) {
-                    System.out.println("Token received");
-                    conn = Priman.getInstance().getConnectionManager().getConnection(cloudParam);
+                    ContextManager.addToken(role + location, "r", token);
+                    System.out.println("Token received and saved");
+                    conn = cman.getConnection(cloudParam);
                     info.setAuthToken(token);
 
                     conn.send("REQUEST_FILE");
@@ -72,7 +146,6 @@ public class CommunicationHandler {
 
                     if (((String) conn.receive()).equals("OK")) {
                         System.out.println("Token valid: receiving contents");
-                        //meta = (FileMeta) conn.receive(); TODO momenteel niet nodig
                         result = (ArrayList<FileMeta>) conn.receive();
                         conn.close();
                     }
@@ -90,12 +163,19 @@ public class CommunicationHandler {
     public static byte[] requestFileContents(String role, String location) throws Exception {
         byte[] result = null;
 
-        Connection conn = Priman.getInstance().getConnectionManager().getConnection(cloudParam);
+        Connection conn = cman.getConnection(cloudParam);
 
         ConnectInfo info = new ConnectInfo();
         info.setAction("r");
         info.setRel_location(location);
         info.setRole(role);
+        AuthToken saved = ContextManager.getToken(role, location, "r");
+        if (saved != null) {
+            System.out.println("Reusing saved token");
+            info.setAuthToken(saved);
+        } else {
+            System.out.println("No token found, requesting without one");
+        }
 
         conn.send("REQUEST_FILE");
         conn.send(info);
@@ -103,7 +183,6 @@ public class CommunicationHandler {
         switch ((String) conn.receive()) {
             case "OK":
                 System.out.println("Token valid: receiving contents");
-                //meta = (FileMeta) conn.receive(); TODO momenteel niet nodig
                 result = (byte[]) conn.receive();
                 conn.close();
                 break;
@@ -112,10 +191,11 @@ public class CommunicationHandler {
                 UUID session = (UUID) conn.receive();
                 conn.close();
 
-                Map<String, byte[]> token = getToken(role, "r", session);
+                AuthToken token = getToken(role, "r", session);
                 if (token != null) {
-                    System.out.println("Token received");
-                    conn = Priman.getInstance().getConnectionManager().getConnection(cloudParam);
+                    ContextManager.addToken(role + location, "r", token);
+                    System.out.println("Token received and saved");
+                    conn = cman.getConnection(cloudParam);
                     info.setAuthToken(token);
 
                     conn.send("REQUEST_FILE");
@@ -123,7 +203,6 @@ public class CommunicationHandler {
 
                     if (((String) conn.receive()).equals("OK")) {
                         System.out.println("Token valid: receiving contents");
-                        //meta = (FileMeta) conn.receive(); TODO momenteel niet nodig
                         result = (byte[]) conn.receive();
                         conn.close();
                     }
@@ -138,24 +217,47 @@ public class CommunicationHandler {
 
 
     @SuppressWarnings("unchecked")
-    private static Map<String, byte[]> getToken(String role, String action, UUID session) throws Exception {
-        Map<String, byte[]> token = null;
+    private static AuthToken getToken(String role, String action, UUID session) throws Exception {
+        AuthToken token = null;
 
-        Connection conn = Priman.getInstance().getConnectionManager().getConnection(verificationParam);
+        Connection conn = cman.getConnection(verificationParam);
 
         conn.send("AUTHENTICATE");
         conn.send(role); //TODO proof ook zenden
         conn.send(action);
         conn.send(session);
 
+        /*Load credential*/
+        List<Credential> creds = new ArrayList<>();
+        Credential cred = pman.load(home.resolve("credentials/cred_user_" + role + ".xml"));
+        cred.setSecret(pman.load(home.resolve("credentials/secret_" + role + ".xml")));
+        creds.add(cred);
+
+        /*Receive role policy and nonce*/
+        be.kuleuven.cs.priman.credential.claim.representation.policy.Policy pol = spman.parsePolicy((String) conn.receive());
+        Nonce nonce = (Nonce) conn.receive();
+
+        /*Receive PolicyResponseRequest*/
         PolicyResponseRequest request = (PolicyResponseRequest) conn.receive();
+
+        /*Create role proof and PolicySetResponse*/
+        pol.initialize(creds);
+        if (pol.getCredentialClaims().isEmpty()) {
+            System.out.println("Can not satisfy claim");
+            return null;
+        }
+        Proof proof = credman.generateProof(pol.getClaim(), nonce);
+        System.out.println("Proof is valid: " + proof.isValid());
+        System.out.println("Proof satistfies policy: " + proof.satisfiesPolicy(pol));
+
         PolicySetResponse resp = createAnswer(request);
+
+        /*Send PolicySetResponse and role proof*/
         conn.send(resp);
+        conn.send(credman.serializeProof(proof));
 
         if (((String) conn.receive()).equals("OK")) {
-            token = (Map<String, byte[]>) conn.receive();
-            long until = (long) conn.receive();
-            //TODO store token + until
+            token = (AuthToken) conn.receive();
         }
         conn.close();
 

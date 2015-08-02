@@ -31,18 +31,18 @@
             >
             <TextView
                 android:id="@+id/modified"
-                android:layout_width="fill_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_weight="0.60"
                 android:text="last modified"
                 android:layout_marginLeft="10dp"
                 android:gravity="left"
                 android:textColor="#ff929292" />
             <TextView
                 android:id="@+id/size"
-                android:layout_width="fill_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_weight="0.40"
                 android:text="1315 kB"
                 android:layout_marginRight="15dp"
                 android:gravity="right"
