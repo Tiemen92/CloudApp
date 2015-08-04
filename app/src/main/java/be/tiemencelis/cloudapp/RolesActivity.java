@@ -12,6 +12,7 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
@@ -29,7 +30,8 @@ import be.tiemencelis.context.NfcActivity;
 
 
 public class RolesActivity extends AppCompatActivity {
-    private String[] roles;
+    private List<String> roles;
+    private ArrayAdapter<String> adapter;
     private static final URI home = (new File("/sdcard/CloudApp/")).toURI();
 
     public RolesActivity() {
@@ -55,7 +57,8 @@ public class RolesActivity extends AppCompatActivity {
             //System.out.println("Credential found: " + cred.getName().substring(10, cred.getName().length()-4));
         }
         Collections.sort(roleNames);
-        roles =  roleNames.toArray(new String[roleNames.size()]);
+        //roles =  roleNames.toArray(new String[roleNames.size()]);
+        roles = roleNames;
     }
 
     @Override
@@ -66,7 +69,9 @@ public class RolesActivity extends AppCompatActivity {
         StrictMode.setThreadPolicy(policy);
 
         ListView list = (ListView) findViewById(R.id.list);
-        list.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, roles));
+        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, roles);
+        adapter.setNotifyOnChange(true);
+        list.setAdapter(adapter);
 
         ContextManager.init(this);
 
@@ -89,7 +94,7 @@ public class RolesActivity extends AppCompatActivity {
                     Bundle b;
                     Intent i;
                     try {
-                        files = CommunicationHandler.requestDirectoryContents(roles[position], "/");
+                        files = CommunicationHandler.requestDirectoryContents(roles.get(position), "/");
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -99,7 +104,7 @@ public class RolesActivity extends AppCompatActivity {
                     } else {
                         b = new Bundle();
                         b.putString("location", "/");
-                        b.putString("role", roles[position]);
+                        b.putString("role", roles.get(position));
                         b.putSerializable("files", files);
                         i = new Intent(RolesActivity.this, FileBrowserActivity.class);
                         i.putExtras(b);
@@ -117,7 +122,7 @@ public class RolesActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 LayoutInflater inflater = getLayoutInflater();
-                View layout = inflater.inflate(R.layout.input_dialog, (ViewGroup) findViewById(R.id.layout_root));
+                final View layout = inflater.inflate(R.layout.input_dialog, (ViewGroup) findViewById(R.id.layout_root));
                 final EditText input = (EditText) layout.findViewById(R.id.editTextDialog);
                 input.setTransformationMethod(android.text.method.SingleLineTransformationMethod.getInstance());
 
@@ -127,7 +132,15 @@ public class RolesActivity extends AppCompatActivity {
                         .setView(layout)
                         .setPositiveButton("Create", new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int which) {
-                                createAccount(input.getEditableText().toString());
+                                int admin = 0;
+                                boolean credOnly = ((CheckBox) layout.findViewById(R.id.credentialCheckBox)).isChecked();
+                                if (((CheckBox) layout.findViewById(R.id.adminCheckBox)).isChecked()) {
+                                    admin = 1;
+                                }
+                                createAccount(input.getEditableText().toString(), credOnly, admin);
+                                LoadRoles();
+                                adapter.clear();
+                                adapter.addAll(roles);
                             }
                         })
                         .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -138,48 +151,9 @@ public class RolesActivity extends AppCompatActivity {
                         })
                         .create().show();
 
-
+                /*TODO check nfc use*/
                 //Intent i = new Intent(RolesActivity.this, NfcActivity.class);
                 //startActivity(i);
-
-                try {
-                    /*
-                    //////
-                    //Authenticate
-                    //////
-                    List<Credential> creds = new ArrayList<>();
-                    Credential cred = pMgr.load(home.resolve("credentials/cred_user_Tiemen.xml"));
-                    cred.setSecret(pMgr.load(home.resolve("credentials/secret_Tiemen.xml")));
-                    creds.add(cred);
-                    Attribute att = cred.getAttribute("Name");
-                    if (att != null) {
-                        System.out.println(att.getLabel() + " : " + att.getValue());
-                    }
-                    //INITIALIZE CONNECTION
-                    SSLParameters authParam = pMgr.load(home.resolve("app_data/verificationConnection-ssl.param"));
-                    Connection conn = cmgr.getConnection(authParam);
-
-                    //RECEIVE THE POLICY
-                    Policy pol = spMgr.parsePolicy((String) conn.receive());
-                    //System.out.println("Policy: " + pol.getStringRepresentation());
-                    //RECEIVE THE NONCE
-                    Nonce nonce = (Nonce) conn.receive();
-                    System.out.println("Nonce: " + nonce.toString());
-                    //CREATE CLAIM
-                    pol.initialize(creds);
-                    if (pol.getCredentialClaims().isEmpty()) {
-                        System.out.println("Can not satisfy claim");
-                    } else {
-                        Proof proof = cMan.generateProof(pol.getClaim(), nonce);
-                        System.out.println("Proof is valid: " + proof.isValid());
-                        System.out.println("Proof satistfies policy: " + proof.satisfiesPolicy(pol));
-                        conn.send(cMan.serializeProof(proof));
-                    }
-                    conn.close();*/
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
             }
         });
 
@@ -189,15 +163,22 @@ public class RolesActivity extends AppCompatActivity {
     }
 
 
-    public void createAccount(final String name) {
+    public void createAccount(final String name, final boolean credentialOnly, final int admin) {
         (new Runnable() {
             public void run() {
                 try {
-                    if (CommunicationHandler.createAccount(name)) {
-                        showToast("Account successfully created");
-                    }
-                    else {
-                        showToast("Error creating account");
+                    if (credentialOnly) {
+                        if (CommunicationHandler.requestCredential(name)) {
+                            showToast("Credential successfully created");
+                        } else {
+                            showToast("Error requesting credential");
+                        }
+                    } else {
+                        if (CommunicationHandler.createAccount(name, admin)) {
+                            showToast("Account successfully created");
+                        } else {
+                            showToast("Error creating account");
+                        }
                     }
                 } catch (Exception e) {
                     e.printStackTrace();

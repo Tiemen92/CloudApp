@@ -4,7 +4,12 @@ import android.bluetooth.BluetoothDevice;
 import android.location.Location;
 import android.net.wifi.WifiInfo;
 
+import com.ibm.zurich.idmx.dm.DomNym;
+import com.ibm.zurich.idmx.dm.MasterSecret;
+import com.ibm.zurich.idmx.dm.Nym;
+
 import java.io.File;
+import java.math.BigInteger;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -52,12 +57,13 @@ public class CommunicationHandler {
     private static final SSLParameters caParam = pman.load(home.resolve("app_data/caConnection-ssl.param"));
 
 
-    public static boolean createAccount(String role) throws Exception {
+    public static boolean createAccount(String role, int admin) throws Exception {
         Connection conn = cman.getConnection(cloudParam);
 
         /*Start request create account*/
         conn.send("CREATE_ACCOUNT");
         conn.send(role);
+        conn.send(admin);
         /*Rol already exists, cancel*/
         if (!((String) conn.receive()).equals("OK")) {
             conn.close();
@@ -66,30 +72,20 @@ public class CommunicationHandler {
 
         /*Request credential for provided role name at the CA*/
         try {
-            Connection conn2 = cman.getConnection(caParam);
-            IssuanceSpecification ispec = pman.load(home.resolve("app_data/idmxIssuanceSpecification.xml"));
-            Map<String, String> values = new HashMap<>();
-            values.put("Name", role);
-            ispec.setValues(values);
-            //SEND IT TO THE ISSUER
-            conn2.send(ispec.getRequestForIssuer());
-            //INITIATE THE ISSUING PROTOCOL
-            Credential cred = credman.getIssuedCredential(conn2, ispec);
-            pman.store(cred, home.resolve("credentials/cred_user_" + role + ".xml"));
-            pman.store(cred.getSecret(), home.resolve("credentials/secret_" + role + ".xml"));
-            conn2.close();
+            requestCredential(role);
         }
         /*Requesting credential failed, cancel protocol*/
         catch (Exception e) {
             conn.send("NOK");
             conn.close();
+            e.printStackTrace();
             return false;
         }
 
         /*Credential successfully obtained*/
-        conn.send("OK");
+        conn.send("CREDENTIAL_OBTAINED");
         /*Creation of account failed, cancel protocol and remove credential*/
-        if (!((String) conn.receive()).equals("OK")) {
+        if (!((String) conn.receive()).equals("ACCOUNT_CREATED")) {
             File credential = new File(home.resolve("credentials/cred_user_" + role + ".xml"));
             credential.delete();
             credential = new File(home.resolve("credentials/secret_" + role + ".xml"));
@@ -99,6 +95,91 @@ public class CommunicationHandler {
         }
         /*Account successfully created*/
         return true;
+    }
+
+
+    public static boolean requestCredential(String role) throws Exception {
+        Connection conn = cman.getConnection(caParam);
+        IssuanceSpecification ispec = pman.load(home.resolve("app_data/idmxIssuanceSpecification.xml"));
+        Map<String, String> values = new HashMap<>();
+        values.put("Name", role);
+        ispec.setValues(values);
+        //SEND IT TO THE ISSUER
+        conn.send(ispec.getRequestForIssuer());
+        //INITIATE THE ISSUING PROTOCOL
+        Credential cred = credman.getIssuedCredential(conn, ispec);
+        pman.store(cred, home.resolve("credentials/cred_user_" + role + ".xml"));
+        pman.store(cred.getSecret(), home.resolve("credentials/secret_" + role + ".xml"));
+        conn.close();
+
+        return true;
+    }
+
+
+    /*TODO new policy ipv copy*/
+    public static void shareData(String role, String shareRole, String location) throws Exception {
+        Connection conn = cman.getConnection(cloudParam);
+
+        ConnectInfo info = new ConnectInfo();
+        info.setAction("r");
+        info.setRel_location(location);
+        info.setRole(role);
+        AuthToken saved = ContextManager.getToken(role, location, "r");
+        if (saved != null) {
+            System.out.println("Reusing saved token");
+            info.setAuthToken(saved);
+        } else {
+            System.out.println("No token found, requesting without one");
+        }
+
+        conn.send("SHARE_DATA");
+        conn.send(info);
+
+        switch ((String) conn.receive()) {
+            case "OK":
+                System.out.println("Token valid: send role name to share with");
+                conn.send("COPY");
+                conn.send(shareRole);
+                if (!conn.receive().equals("OK")) {
+                    conn.close();
+                    throw new Exception("Error sharing data with " + shareRole);
+                }
+                conn.close();
+                break;
+            case "AUTHENTICATE":
+                System.out.println("Need to authenticate");
+                UUID session = (UUID) conn.receive();
+                conn.close();
+
+                AuthToken token = getToken(role, "r", session);
+                if (token != null) {
+                    ContextManager.addToken(role + location, "r", token);
+                    System.out.println("Token received and saved");
+                    conn = cman.getConnection(cloudParam);
+                    info.setAuthToken(token);
+
+                    conn.send("SHARE_DATA");
+                    conn.send(info);
+                    if (conn.receive().equals("OK")) {
+                        System.out.println("Token valid: send role name to share with");
+                        conn.send("COPY");
+                        conn.send(shareRole);
+                        if (!conn.receive().equals("OK")) {
+                            conn.close();
+                            throw new Exception("(Server) Error sharing data with " + shareRole);
+                        }
+                    } else {
+                        conn.close();
+                        throw new Exception("(Token) Error sharing data with " + shareRole);
+                    }
+                    conn.close();
+                }
+                break;
+            default:
+                System.out.println("No admin rights, data sharing denied");
+                conn.close();
+                throw new Exception("No admin rights, data sharing denied");
+        }
     }
 
 
@@ -230,7 +311,9 @@ public class CommunicationHandler {
         /*Load credential*/
         List<Credential> creds = new ArrayList<>();
         Credential cred = pman.load(home.resolve("credentials/cred_user_" + role + ".xml"));
-        cred.setSecret(pman.load(home.resolve("credentials/secret_" + role + ".xml")));
+        MasterSecret ms = new MasterSecret(((MasterSecret) pman.load(home.resolve("credentials/secret_" + role + ".xml"))).getValue(),
+                            URI.create("http://certificateauthority.be:8080/gp.xml"), new HashMap<String, Nym>(), new HashMap<String, DomNym>());
+        cred.setSecret(ms);
         creds.add(cred);
 
         /*Receive role policy and nonce*/

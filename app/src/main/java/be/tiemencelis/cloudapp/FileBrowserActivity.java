@@ -1,14 +1,22 @@
 package be.tiemencelis.cloudapp;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.MimeTypeMap;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.BufferedOutputStream;
@@ -56,6 +64,37 @@ public class FileBrowserActivity extends AppCompatActivity {
 
             }
         });
+
+        Button shareButton = (Button) findViewById(R.id.bShare); /*TODO new policies ipv copy*/
+        shareButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                LayoutInflater inflater = getLayoutInflater();
+                final View layout = inflater.inflate(R.layout.input_dialog, (ViewGroup) findViewById(R.id.layout_root));
+                final EditText input = (EditText) layout.findViewById(R.id.editTextDialog);
+                input.setTransformationMethod(android.text.method.SingleLineTransformationMethod.getInstance());
+
+                new AlertDialog.Builder(FileBrowserActivity.this)
+                        .setTitle("Share folder")
+                        .setMessage("Enter role/username to share with:")
+                        .setView(layout)
+                        .setPositiveButton("Share", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which) {
+                                shareData(input.getEditableText().toString());
+                            }
+                        })
+                        .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which) {
+                                showToast("Share folder canceled");
+                                dialog.cancel();
+                            }
+                        })
+                        .create().show();
+                layout.findViewById(R.id.checkboxes).setVisibility(View.GONE);
+                /*((CheckBox) layout.findViewById(R.id.credentialCheckBox)).setVisibility(View.GONE);
+                ((TextView) layout.findViewById(R.id.textCheckBox)).setVisibility(View.GONE);*/
+            }
+        });
     }
 
 
@@ -71,7 +110,7 @@ public class FileBrowserActivity extends AppCompatActivity {
             Bundle b;
             Intent i;
             try {
-                newFiles = CommunicationHandler.requestDirectoryContents(role, location + files.get(position).getName());
+                newFiles = CommunicationHandler.requestDirectoryContents(role, location + files.get(position).getName() + "/");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -137,6 +176,21 @@ public class FileBrowserActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
+    }
+
+
+    public void shareData(final String shareRole) {
+        (new Runnable() {
+            public void run() {
+                try {
+                    CommunicationHandler.shareData(role, shareRole, location);
+                    showToast("Folder successfully shared with " + shareRole);
+                } catch (Exception e) {
+                    showToast("Error sharing folder with " + shareRole);
+                    e.printStackTrace();
+                }
+            }
+        }).run();
     }
 
 
