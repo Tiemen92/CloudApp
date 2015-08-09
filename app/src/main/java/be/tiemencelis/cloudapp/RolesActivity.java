@@ -30,7 +30,7 @@ import be.tiemencelis.context.NfcActivity;
 
 
 public class RolesActivity extends AppCompatActivity {
-    private List<String> roles;
+    private static List<String> roles;
     private ArrayAdapter<String> adapter;
     private static final URI home = (new File("/sdcard/CloudApp/")).toURI();
 
@@ -39,25 +39,24 @@ public class RolesActivity extends AppCompatActivity {
     }
 
 
+    public static List<String> getRoles() {
+        return roles;
+    }
+
+
     private void LoadRoles() {
         File credentialFolder = new File("/sdcard/CloudApp/credentials/");
         FilenameFilter credsOnlyFilter = new FilenameFilter() {
             public boolean accept(File dir, String name) {
-                if (name.startsWith("cred_user_")) {
-                    return true;
-                } else {
-                    return false;
-                }
+                return name.startsWith("cred_user_");
             }
         };
         File[] credentials = credentialFolder.listFiles(credsOnlyFilter);
         List<String> roleNames = new ArrayList<>();
         for (File cred : credentials) {
             roleNames.add(cred.getName().substring(10, cred.getName().length()-4));
-            //System.out.println("Credential found: " + cred.getName().substring(10, cred.getName().length()-4));
         }
         Collections.sort(roleNames);
-        //roles =  roleNames.toArray(new String[roleNames.size()]);
         roles = roleNames;
     }
 
@@ -156,11 +155,8 @@ public class RolesActivity extends AppCompatActivity {
                 //startActivity(i);
             }
         });
-
-
-
-
     }
+
 
 
     public void createAccount(final String name, final boolean credentialOnly, final int admin) {
@@ -190,11 +186,17 @@ public class RolesActivity extends AppCompatActivity {
 
     public void showToast(final String toast) {
         runOnUiThread(new Runnable() {
-            public void run()
-            {
+            public void run() {
                 Toast.makeText(RolesActivity.this, toast, Toast.LENGTH_LONG).show();
             }
         });
+    }
+
+
+    @Override
+    protected void onDestroy() {
+        ContextManager.tearDown();
+        super.onDestroy();
     }
 
 

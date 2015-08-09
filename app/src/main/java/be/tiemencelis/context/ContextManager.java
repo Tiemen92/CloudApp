@@ -10,6 +10,8 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.ConnectivityManager;
+import android.net.nsd.NsdManager;
+import android.net.nsd.NsdServiceInfo;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
@@ -19,13 +21,34 @@ import android.telephony.TelephonyManager;
 import android.telephony.cdma.CdmaCellLocation;
 import android.telephony.gsm.GsmCellLocation;
 
+import com.ibm.zurich.idmx.dm.DomNym;
+import com.ibm.zurich.idmx.dm.MasterSecret;
+import com.ibm.zurich.idmx.dm.Nym;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.URI;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import be.kuleuven.cs.priman.Priman;
+import be.kuleuven.cs.priman.credential.Credential;
+import be.kuleuven.cs.priman.credential.claim.representation.policy.Policy;
+import be.kuleuven.cs.priman.credential.proof.Nonce;
+import be.kuleuven.cs.priman.credential.proof.Proof;
+import be.kuleuven.cs.priman.manager.CredentialManager;
+import be.kuleuven.cs.priman.manager.PersistenceManager;
+import be.kuleuven.cs.priman.manager.ServerPolicyManager;
 import be.tiemencelis.beans.AuthToken;
+import be.tiemencelis.cloudapp.RolesActivity;
 
 
 /**
@@ -51,6 +74,13 @@ public class ContextManager extends BroadcastReceiver {
     private static long lastNtpTime = 0;
 
     private static Map<Map.Entry<String, String>, AuthToken> tokens;
+
+    private static String SERVICE_NAME = "CloudApp";
+    private static String SERVICE_TYPE = "_cloudapp._tcp.";
+    private static int PORT = 0;
+    private static NsdManager mNsdManager;
+    private static CredentialIssuer credIssuerServer;
+    private static Map<String, Integer> lanClients;
 
 
     /**
@@ -92,6 +122,12 @@ public class ContextManager extends BroadcastReceiver {
 
         lastNFCTags = new HashMap<>();
         tokens = new HashMap<>();
+
+        lanClients = new HashMap<>();
+        credIssuerServer = new CredentialIssuer();
+
+        //System.out.println("Port: " + PORT);
+        //registerService(PORT);
 
         /*Request ntp time as init value*/
         try {
@@ -310,10 +346,11 @@ public class ContextManager extends BroadcastReceiver {
         public void onLocationChanged(Location location) {
             if (isBetterLocation(location, lastLocation)) {
                 lastLocation = location;
-                System.out.println("New location (better): " + location.toString());
+                //System.out.println("New location (better): " + location.toString());
             }
-            else
-                System.out.println("New location (worse): " + location.toString());
+            else {
+                //System.out.println("New location (worse): " + location.toString());
+            }
         }
 
         public void onStatusChanged(String provider, int status, Bundle extras) {}
@@ -385,4 +422,302 @@ public class ContextManager extends BroadcastReceiver {
         }
         return provider1.equals(provider2);
     }
+
+
+    private static void setPort(int port) {
+        PORT = port;
+    }
+
+
+    public static Proof getCredentialProof(String role, Nonce nonce) throws Exception {
+        Map.Entry<String, Integer> client = getFirstLanClient();
+        if (client == null) {
+            System.out.println("No clients found in network to send to");
+            return null;
+        }
+        URI home = (new File("/sdcard/CloudApp/")).toURI();
+        Priman priman = Priman.getInstance();
+        PersistenceManager pMgr = priman.getPersistenceManager();
+        CredentialManager cMan = priman.getCredentialManager();
+        priman.loadConfiguration(home.resolve("app_data/priman.conf"));
+
+        Socket sendSocket = new Socket(client.getKey(), client.getValue());
+        ObjectOutputStream dOut = new ObjectOutputStream(sendSocket.getOutputStream());
+
+        /*Send role and nonce*/
+        dOut.writeUTF(role);
+        dOut.flush();
+        dOut.writeObject(nonce);
+        dOut.flush();
+
+        ObjectInputStream dIn = new ObjectInputStream(sendSocket.getInputStream());
+        /*If client does not own the requested role, abort*/
+        String answer = dIn.readUTF();
+        if (answer.equals("NO")) {
+            System.out.println("Client does not own the requested role");
+            dIn.close();
+            dOut.close();
+            return null;
+        }
+        else if (!answer.equals("OK")) {
+            System.out.println("Wrong message received: " + answer);
+            dIn.close();
+            dOut.close();
+            return null;
+        }
+
+        /*Send policy*/
+        Policy pol = pMgr.load(home.resolve("app_data/authPolicy.xml"));
+        dOut.writeUTF(pol.getStringRepresentation().replace("$ROLE_NAME$", role));
+        dOut.flush();
+
+        /*Receive proof*/
+        Proof proof = cMan.deSerialize(dIn.readObject());
+        System.out.println("Proof received");
+
+        dIn.close();
+        dOut.close();
+        sendSocket.close();
+
+        return proof;
+    }
+
+
+    private static class CredentialIssuer {
+        ServerSocket serverSocket = null;
+        Thread mThread = null;
+        PersistenceManager pman = Priman.getInstance().getPersistenceManager();
+        ServerPolicyManager spman = Priman.getInstance().getServerPolicyManager();
+        CredentialManager credman = Priman.getInstance().getCredentialManager();
+        URI home = (new File("/sdcard/CloudApp/")).toURI();
+
+            public CredentialIssuer() {
+                try {
+                    serverSocket = new ServerSocket(0);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                setPort(serverSocket.getLocalPort());
+                registerService(PORT);
+                mThread = new Thread(new IssuerThread());
+                mThread.start();
+            }
+
+        class IssuerThread implements Runnable {
+            @Override
+            public void run() {
+                try {
+                    while(true) {
+                        System.out.println("Server issuer listening on port " + serverSocket.getLocalPort());
+                        Socket receiveSocket = serverSocket.accept();
+
+                        ObjectInputStream dIn = new ObjectInputStream(receiveSocket.getInputStream());
+
+                        /*Receive role and nonce*/
+                        String role = dIn.readUTF();
+                        Nonce nonce = (Nonce) dIn.readObject();
+                        System.out.println("Client " + receiveSocket.getInetAddress().getHostAddress() + " requesting proof for role " + role);
+
+                        ObjectOutputStream dOut = new ObjectOutputStream(receiveSocket.getOutputStream());
+                        /*User does not own the requested role, deny requests*/
+                        if (!RolesActivity.getRoles().contains(role)) {
+                            dOut.writeUTF("NO");
+                            dOut.flush();
+                            dOut.close();
+                            dIn.close();
+                            continue;
+                        }
+
+                        /*User does own the requested role, respond with OK*/
+                        dOut.writeUTF("OK");
+                        dOut.flush();
+
+                        /*Load credential*/
+                        List<Credential> creds = new ArrayList<>();
+                        Credential cred = pman.load(home.resolve("credentials/cred_user_" + role + ".xml"));
+                        MasterSecret ms = new MasterSecret(((MasterSecret) pman.load(home.resolve("credentials/secret_" + role + ".xml"))).getValue(),
+                                URI.create("http://cloudapp.freevar.com/gp.xml"), new HashMap<String, Nym>(), new HashMap<String, DomNym>());
+                        cred.setSecret(ms);
+                        creds.add(cred);
+
+                        System.out.println(creds.get(0).toString());
+
+                        /*Receive role policy*/
+                        Policy pol = spman.parsePolicy(dIn.readUTF());
+                        System.out.println(pol.toString());
+
+                        /*Create and send proof*/
+                        pol.initialize(creds);
+                        if (pol.getCredentialClaims().isEmpty()) {
+                            System.out.println("Can not satisfy claim");
+                            continue;
+                        }
+                        Proof proof = credman.generateProof(pol.getClaim(), nonce);
+                        dOut.writeObject(credman.serializeProof(proof));
+                        dOut.flush();
+                        System.out.println("Proof of role send");
+
+                        dIn.close();
+                        dOut.close();
+                        receiveSocket.close();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+
+    /**
+     * Client and server code for discovering other CloudApp devices on the network below
+     *
+     */
+
+    public static void registerService(int port) {
+        NsdServiceInfo serviceInfo = new NsdServiceInfo();
+        serviceInfo.setServiceName(SERVICE_NAME);
+        serviceInfo.setServiceType(SERVICE_TYPE);
+        serviceInfo.setPort(port);
+
+        mNsdManager = (NsdManager) context.getSystemService(Context.NSD_SERVICE);
+
+        mNsdManager.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, mRegistrationListener);
+        mNsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, mDiscoveryListener);
+    }
+
+
+    private static NsdManager.RegistrationListener mRegistrationListener = new NsdManager.RegistrationListener() {
+
+        @Override
+        public void onServiceRegistered(NsdServiceInfo NsdServiceInfo) {
+            String mServiceName = NsdServiceInfo.getServiceName();
+            SERVICE_NAME = mServiceName;
+            System.out.println("Registered name : " + mServiceName + " on port " + NsdServiceInfo.getPort());
+        }
+
+        @Override
+        public void onRegistrationFailed(NsdServiceInfo serviceInfo,
+                                         int errorCode) {
+            // Registration failed! Put debugging code here to determine
+            // why.
+            System.out.println("Service register failed " + serviceInfo.toString() + " error: " + errorCode);
+        }
+
+        @Override
+        public void onServiceUnregistered(NsdServiceInfo serviceInfo) {
+            // Service has been unregistered. This only happens when you
+            // call
+            // NsdManager.unregisterService() and pass in this listener.
+            System.out.println("Service Unregistered : " + serviceInfo.getServiceName());
+        }
+
+        @Override
+        public void onUnregistrationFailed(NsdServiceInfo serviceInfo,
+                                           int errorCode) {
+            // Unregistration failed. Put debugging code here to determine
+            // why.
+            System.out.println("Service unregister failed");
+        }
+    };
+
+
+
+
+    // Instantiate a new DiscoveryListener
+    private static NsdManager.DiscoveryListener mDiscoveryListener = new NsdManager.DiscoveryListener() {
+
+        //  Called as soon as service discovery begins.
+        @Override
+        public void onDiscoveryStarted(String regType) {
+            System.out.println("Service discovery started");
+        }
+
+        @Override
+        public void onServiceFound(NsdServiceInfo service) {
+            // A service was found!  Do something with it.
+            //System.out.println("Service discovery success" + service);
+            if (!service.getServiceType().equals(SERVICE_TYPE)) {
+                // Service type is the string containing the protocol and
+                // transport layer for this service.
+                System.out.println("Unknown Service Type: " + service.getServiceType());
+            } else if (service.getServiceName().equals(SERVICE_NAME)) {
+                // The name of the service tells the user what they'd be
+                // connecting to. It could be "Bob's Chat App".
+                //System.out.println("Same machine: " + SERVICE_NAME);
+            } else if (service.getServiceName().contains("CloudApp")){
+                mNsdManager.resolveService(service, new MyResolveListener());
+            }
+        }
+
+        @Override
+        public void onServiceLost(NsdServiceInfo service) {
+            // When the network service is no longer available.
+            // Internal bookkeeping code goes here.
+            //System.out.println("service lost" + service);
+        }
+
+        @Override
+        public void onDiscoveryStopped(String serviceType) {
+            System.out.println("Discovery stopped: " + serviceType);
+        }
+
+        @Override
+        public void onStartDiscoveryFailed(String serviceType, int errorCode) {
+            System.out.println("Discovery failed: Error code:" + errorCode);
+            mNsdManager.stopServiceDiscovery(this);
+        }
+
+        @Override
+        public void onStopDiscoveryFailed(String serviceType, int errorCode) {
+            System.out.println("Discovery failed: Error code:" + errorCode);
+            mNsdManager.stopServiceDiscovery(this);
+        }
+    };
+
+
+
+    //private static NsdManager.ResolveListener mResolveListener =;
+    private static class MyResolveListener implements NsdManager.ResolveListener {
+
+        @Override
+        public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
+            // Called when the resolve fails. Use the error code to debug.
+            System.out.println("Resolve failed " + errorCode);
+            System.out.println("serivce = " + serviceInfo);
+        }
+
+        @Override
+        public void onServiceResolved(NsdServiceInfo serviceInfo) {
+            if (!serviceInfo.getServiceName().equals(SERVICE_NAME)) {
+                System.out.println("Found at " + serviceInfo.getHost().getHostAddress() + ":" + serviceInfo.getPort());
+                addLanClient(serviceInfo.getHost().getHostAddress(), serviceInfo.getPort());
+            }
+        }
+    }
+
+
+    synchronized private static void addLanClient(String host, int port) {
+        if (!lanClients.isEmpty()) {
+            lanClients.clear();
+        }
+        lanClients.put(host, port);
+    }
+
+
+    synchronized public static Map.Entry<String, Integer> getFirstLanClient() {
+        if (lanClients.isEmpty()) {
+            System.out.println("No lan clients in list to get");
+            return null;
+        }
+        return lanClients.entrySet().iterator().next();
+    }
+
+
+    public static void tearDown() {
+        mNsdManager.unregisterService(mRegistrationListener);
+        mNsdManager.stopServiceDiscovery(mDiscoveryListener);
+    }
+
+
 }
