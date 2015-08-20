@@ -185,7 +185,7 @@ public class CommunicationHandler {
     @SuppressWarnings("unchecked")
     public static ArrayList<FileMeta> requestDirectoryContents(String role, String location) throws Exception {
         ArrayList<FileMeta> result = null;
-        long start_total, end_total, start_token = 0, end_token = 0, start_data = 0, end_data = 0;
+        long start_total, end_total, start_token = 0, end_token = 0;
         start_total = System.currentTimeMillis();
         Connection conn = cman.getConnection(cloudParam);
 
@@ -195,10 +195,10 @@ public class CommunicationHandler {
         info.setRole(role);
         AuthToken saved = ContextManager.getToken(role, location, "r"); //TODO token saven
         if (saved != null) {
-            System.out.println("Reusing saved token");
+            //System.out.println("Reusing saved token");
             info.setAuthToken(saved);
         } else {
-            System.out.println("No token found, requesting without one");
+            //System.out.println("No token found, requesting without one");
         }
 
         conn.send("REQUEST_FILE");
@@ -206,12 +206,12 @@ public class CommunicationHandler {
 
         switch ((String) conn.receive()) {
             case "OK":
-                System.out.println("Token valid: receiving contents");
+                //System.out.println("Token valid: receiving contents");
                 result = (ArrayList<FileMeta>) conn.receive();
                 conn.close();
                 break;
             case "AUTHENTICATE":
-                System.out.println("Need to authenticate");
+                //System.out.println("Need to authenticate");
                 UUID session = (UUID) conn.receive();
                 conn.close();
 
@@ -220,9 +220,8 @@ public class CommunicationHandler {
                 end_token = System.currentTimeMillis();
                 if (token != null) {
                     ContextManager.addToken(role + location, "r", token);
-                    System.out.println("Token received and saved");
+                    //System.out.println("Token received and saved");
 
-                    start_data = System.currentTimeMillis();
                     conn = cman.getConnection(cloudParam);
                     info.setAuthToken(token);
 
@@ -230,20 +229,17 @@ public class CommunicationHandler {
                     conn.send(info);
 
                     if (conn.receive().equals("OK")) {
-                        System.out.println("Token valid: receiving contents");
+                        //System.out.println("Token valid: receiving contents");
                         result = (ArrayList<FileMeta>) conn.receive();
                         conn.close();
                     }
-                    end_data = System.currentTimeMillis();
                 }
 
                 break;
         }
 
         end_total = System.currentTimeMillis();
-        System.out.println("Total: " + (end_total-start_total) + "ms");
-        /*System.out.println("Token: " + (end_token-start_token) + "ms");
-        System.out.println("Data: " + (end_data-start_data) + "ms");*/
+        System.out.println("Total: " + (end_total - start_total) + "ms");
 
 
         return result;
@@ -310,6 +306,7 @@ public class CommunicationHandler {
     @SuppressWarnings("unchecked")
     private static AuthToken getToken(String role, String action, UUID session) throws Exception {
         AuthToken token = null;
+        long start_context, end_context, start_role, end_role;
 
         Connection conn = cman.getConnection(verificationParam);
 
@@ -334,19 +331,22 @@ public class CommunicationHandler {
         PolicyResponseRequest request = (PolicyResponseRequest) conn.receive();
 
         /*Create role proof and PolicySetResponse*/
+        start_role = System.currentTimeMillis();
         pol.initialize(creds);
         if (pol.getCredentialClaims().isEmpty()) {
             System.out.println("Can not satisfy claim");
             return null;
         }
         Proof proof = credman.generateProof(pol.getClaim(), nonce);
+        end_role = System.currentTimeMillis();
         /*System.out.println("Proof is valid: " + proof.isValid());
         System.out.println("Proof satistfies policy: " + proof.satisfiesPolicy(pol));*/
 
-        long start = System.currentTimeMillis();
+        start_context = System.currentTimeMillis();
         PolicySetResponse resp = createAnswer(request);
-        long end = System.currentTimeMillis();
-        //System.out.println("Context: " + (end - start) + "ms");
+        end_context = System.currentTimeMillis();
+        /*System.out.println("Role: " + (end_role - start_role) + "ms");
+        System.out.println("Context: " + (end_context - start_context) + "ms");*/
 
         /*Send PolicySetResponse and role proof*/
         conn.send(resp);
