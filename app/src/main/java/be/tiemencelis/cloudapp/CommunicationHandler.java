@@ -9,8 +9,10 @@ import com.ibm.zurich.idmx.dm.MasterSecret;
 import com.ibm.zurich.idmx.dm.Nym;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +41,7 @@ import be.tiemencelis.beans.ConnectInfo;
 import be.tiemencelis.beans.FileMeta;
 import be.tiemencelis.beans.PolicyResponseRequest;
 import be.tiemencelis.context.ContextManager;
+import be.tiemencelis.security.SecurityHandler;
 
 /**
  * Created by Tiemen on 12-5-2015.
@@ -127,12 +130,12 @@ public class CommunicationHandler {
         if (saved != null) {
             System.out.println("Reusing saved token");
             info.setAuthToken(saved);
-        } else {
-            System.out.println("No token found, requesting without one");
         }
 
         conn.send("SHARE_DATA");
         conn.send(info);
+
+        SendRoleProof(conn, role);
 
         switch ((String) conn.receive()) {
             case "OK":
@@ -159,6 +162,8 @@ public class CommunicationHandler {
 
                     conn.send("SHARE_DATA");
                     conn.send(info);
+                    SendRoleProof(conn, role);
+
                     if (conn.receive().equals("OK")) {
                         System.out.println("Token valid: send role name to share with");
                         conn.send("COPY");
@@ -185,42 +190,38 @@ public class CommunicationHandler {
     @SuppressWarnings("unchecked")
     public static ArrayList<FileMeta> requestDirectoryContents(String role, String location) throws Exception {
         ArrayList<FileMeta> result = null;
-        long start_total, end_total, start_token = 0, end_token = 0;
-        start_total = System.currentTimeMillis();
         Connection conn = cman.getConnection(cloudParam);
 
         ConnectInfo info = new ConnectInfo();
         info.setAction("r");
         info.setRel_location(location);
         info.setRole(role);
-        AuthToken saved = ContextManager.getToken(role, location, "r"); //TODO token saven
+        AuthToken saved = ContextManager.getToken(role, location, "r");
         if (saved != null) {
-            //System.out.println("Reusing saved token");
+            System.out.println("Reusing saved token");
             info.setAuthToken(saved);
-        } else {
-            //System.out.println("No token found, requesting without one");
         }
 
         conn.send("REQUEST_FILE");
         conn.send(info);
 
+        SendRoleProof(conn, role);
+
         switch ((String) conn.receive()) {
             case "OK":
-                //System.out.println("Token valid: receiving contents");
+                System.out.println("Token valid: receiving contents");
                 result = (ArrayList<FileMeta>) conn.receive();
                 conn.close();
                 break;
             case "AUTHENTICATE":
-                //System.out.println("Need to authenticate");
+                System.out.println("Need to authenticate");
                 UUID session = (UUID) conn.receive();
                 conn.close();
 
-                start_token = System.currentTimeMillis();
                 AuthToken token = getToken(role, "r", session);
-                end_token = System.currentTimeMillis();
                 if (token != null) {
                     ContextManager.addToken(role + location, "r", token);
-                    //System.out.println("Token received and saved");
+                    System.out.println("Token received and saved");
 
                     conn = cman.getConnection(cloudParam);
                     info.setAuthToken(token);
@@ -228,8 +229,10 @@ public class CommunicationHandler {
                     conn.send("REQUEST_FILE");
                     conn.send(info);
 
+                    SendRoleProof(conn, role);
+
                     if (conn.receive().equals("OK")) {
-                        //System.out.println("Token valid: receiving contents");
+                        System.out.println("Token valid: receiving contents");
                         result = (ArrayList<FileMeta>) conn.receive();
                         conn.close();
                     }
@@ -237,10 +240,6 @@ public class CommunicationHandler {
 
                 break;
         }
-
-        end_total = System.currentTimeMillis();
-        System.out.println("Total: " + (end_total - start_total) + "ms");
-
 
         return result;
     }
@@ -260,12 +259,12 @@ public class CommunicationHandler {
         if (saved != null) {
             System.out.println("Reusing saved token");
             info.setAuthToken(saved);
-        } else {
-            System.out.println("No token found, requesting without one");
         }
 
         conn.send("REQUEST_FILE");
         conn.send(info);
+
+        SendRoleProof(conn, role);
 
         switch ((String) conn.receive()) {
             case "OK":
@@ -288,6 +287,8 @@ public class CommunicationHandler {
                     conn.send("REQUEST_FILE");
                     conn.send(info);
 
+                    SendRoleProof(conn, role);
+
                     if (conn.receive().equals("OK")) {
                         System.out.println("Token valid: receiving contents");
                         result = (byte[]) conn.receive();
@@ -303,10 +304,30 @@ public class CommunicationHandler {
     }
 
 
+    private static void SendRoleProof(Connection conn, String role) throws Exception {
+        /*Load credential*/
+        List<Credential> creds = new ArrayList<>();
+        Credential cred = pman.load(home.resolve("credentials/cred_user_" + role + ".xml"));
+        MasterSecret ms = new MasterSecret(((MasterSecret) pman.load(home.resolve("credentials/secret_" + role + ".xml"))).getValue(),
+                URI.create("http://cloudservers:8080/gp.xml"), new HashMap<String, Nym>(), new HashMap<String, DomNym>());
+        cred.setSecret(ms);
+        creds.add(cred);
+
+        /*Receive role policy and nonce*/
+        be.kuleuven.cs.priman.credential.claim.representation.policy.Policy pol = spman.parsePolicy((String)conn.receive());
+        Nonce nonce = (Nonce) conn.receive();
+        pol.initialize(creds);
+        if (pol.getCredentialClaims().isEmpty()) {
+            throw new Exception("Cannot satisfy claim");
+        }
+        Proof proof = credman.generateProof(pol.getClaim(), nonce);
+        conn.send(credman.serializeProof(proof));
+    }
+
+
     @SuppressWarnings("unchecked")
     private static AuthToken getToken(String role, String action, UUID session) throws Exception {
         AuthToken token = null;
-        long start_context, end_context, start_role, end_role;
 
         Connection conn = cman.getConnection(verificationParam);
 
@@ -319,7 +340,7 @@ public class CommunicationHandler {
         List<Credential> creds = new ArrayList<>();
         Credential cred = pman.load(home.resolve("credentials/cred_user_" + role + ".xml"));
         MasterSecret ms = new MasterSecret(((MasterSecret) pman.load(home.resolve("credentials/secret_" + role + ".xml"))).getValue(),
-                            URI.create("http://cloudapp.freevar.com/gp.xml"), new HashMap<String, Nym>(), new HashMap<String, DomNym>());
+                            URI.create("http://cloudservers:8080/gp.xml"), new HashMap<String, Nym>(), new HashMap<String, DomNym>());
         cred.setSecret(ms);
         creds.add(cred);
 
@@ -331,22 +352,16 @@ public class CommunicationHandler {
         PolicyResponseRequest request = (PolicyResponseRequest) conn.receive();
 
         /*Create role proof and PolicySetResponse*/
-        start_role = System.currentTimeMillis();
         pol.initialize(creds);
         if (pol.getCredentialClaims().isEmpty()) {
             System.out.println("Can not satisfy claim");
             return null;
         }
         Proof proof = credman.generateProof(pol.getClaim(), nonce);
-        end_role = System.currentTimeMillis();
         /*System.out.println("Proof is valid: " + proof.isValid());
         System.out.println("Proof satistfies policy: " + proof.satisfiesPolicy(pol));*/
 
-        start_context = System.currentTimeMillis();
         PolicySetResponse resp = createAnswer(request);
-        end_context = System.currentTimeMillis();
-        /*System.out.println("Role: " + (end_role - start_role) + "ms");
-        System.out.println("Context: " + (end_context - start_context) + "ms");*/
 
         /*Send PolicySetResponse and role proof*/
         conn.send(resp);
@@ -462,9 +477,10 @@ public class CommunicationHandler {
                     if (nonce == null) {
                         return null;
                     }
-                    Proof proof = ContextManager.getCredentialProof(item.getOperation().getValue(0), nonce);
+                    //Proof proof = ContextManager.getCredentialProof(item.getOperation().getValue(0), nonce);
+                    String proof = ContextManager.getCredentialProof(item.getOperation().getValue(0), nonce);
                     if (proof != null) {
-                        response.addValue(((String) credman.serializeProof(proof)));
+                        response.addValue(proof);
                     }
                     if (response.getValues().isEmpty()) {
                         return null;

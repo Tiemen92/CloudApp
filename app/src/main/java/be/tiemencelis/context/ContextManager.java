@@ -26,14 +26,16 @@ import com.ibm.zurich.idmx.dm.MasterSecret;
 import com.ibm.zurich.idmx.dm.Nym;
 
 import java.io.File;
-import java.io.IOException;
+import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
+import java.security.PublicKey;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +51,7 @@ import be.kuleuven.cs.priman.manager.PersistenceManager;
 import be.kuleuven.cs.priman.manager.ServerPolicyManager;
 import be.tiemencelis.beans.AuthToken;
 import be.tiemencelis.cloudapp.RolesActivity;
+import be.tiemencelis.security.SecurityHandler;
 
 
 /**
@@ -429,12 +432,13 @@ public class ContextManager extends BroadcastReceiver {
     }
 
 
-    public static Proof getCredentialProof(String role, Nonce nonce) throws Exception {
+    public static String getCredentialProof(String role, Nonce nonce) throws Exception {
         Map.Entry<String, Integer> client = getFirstLanClient();
         if (client == null) {
             System.out.println("No clients found in network to send to");
             return null;
         }
+
         URI home = (new File("/sdcard/CloudApp/")).toURI();
         Priman priman = Priman.getInstance();
         PersistenceManager pMgr = priman.getPersistenceManager();
@@ -472,14 +476,15 @@ public class ContextManager extends BroadcastReceiver {
         dOut.flush();
 
         /*Receive proof*/
-        Proof proof = cMan.deSerialize(dIn.readObject());
+        String enc_proof = dIn.readUTF();
+
         System.out.println("Proof received");
 
         dIn.close();
         dOut.close();
         sendSocket.close();
 
-        return proof;
+        return enc_proof;
     }
 
 
@@ -490,18 +495,21 @@ public class ContextManager extends BroadcastReceiver {
         ServerPolicyManager spman = Priman.getInstance().getServerPolicyManager();
         CredentialManager credman = Priman.getInstance().getCredentialManager();
         URI home = (new File("/sdcard/CloudApp/")).toURI();
+        PublicKey pub_key;
 
-            public CredentialIssuer() {
-                try {
-                    serverSocket = new ServerSocket(0);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                setPort(serverSocket.getLocalPort());
-                registerService(PORT);
-                mThread = new Thread(new IssuerThread());
-                mThread.start();
+        public CredentialIssuer() {
+            try {
+                pub_key = SecurityHandler.LoadPublicKey(home.resolve("app_data/auth_public.txt").getPath());
+                SecurityHandler.init();
+                serverSocket = new ServerSocket(0);
+            } catch (Exception e) {
+                e.printStackTrace();
             }
+            setPort(serverSocket.getLocalPort());
+            registerService(PORT);
+            mThread = new Thread(new IssuerThread());
+            mThread.start();
+        }
 
         class IssuerThread implements Runnable {
             @Override
@@ -536,7 +544,7 @@ public class ContextManager extends BroadcastReceiver {
                         List<Credential> creds = new ArrayList<>();
                         Credential cred = pman.load(home.resolve("credentials/cred_user_" + role + ".xml"));
                         MasterSecret ms = new MasterSecret(((MasterSecret) pman.load(home.resolve("credentials/secret_" + role + ".xml"))).getValue(),
-                                URI.create("http://cloudapp.freevar.com/gp.xml"), new HashMap<String, Nym>(), new HashMap<String, DomNym>());
+                                URI.create("http://cloudservers:8080/gp.xml"), new HashMap<String, Nym>(), new HashMap<String, DomNym>());
                         cred.setSecret(ms);
                         creds.add(cred);
 
@@ -553,7 +561,9 @@ public class ContextManager extends BroadcastReceiver {
                             continue;
                         }
                         Proof proof = credman.generateProof(pol.getClaim(), nonce);
-                        dOut.writeObject(credman.serializeProof(proof));
+                        byte[] enc_proof = SecurityHandler.encrypt(SecurityHandler.serialize(credman.serializeProof(proof)), pub_key);
+
+                        dOut.writeUTF(SecurityHandler.encodeBase64(enc_proof));
                         dOut.flush();
                         System.out.println("Proof of role send");
 
