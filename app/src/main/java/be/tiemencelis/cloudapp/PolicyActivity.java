@@ -188,7 +188,7 @@ public class PolicyActivity extends AppCompatActivity {
                     operationType.setAdapter(new ArrayAdapter<String>(PolicyActivity.this, android.R.layout.simple_spinner_item, op_location));
                     for (int i = 0; i < op_location.length; i++) {
                         if (items.get(position).getOperation().getName().equals(op_location[i])) {
-                            operationType.setSelection(i);
+                            operationType.setSelection(i, false);
                             break;
                         }
                     }
@@ -199,7 +199,7 @@ public class PolicyActivity extends AppCompatActivity {
                     operationType.setAdapter(new ArrayAdapter<String>(PolicyActivity.this, android.R.layout.simple_spinner_item, ops));
                     for (int i = 0; i < ops.length; i++) {
                         if (items.get(position).getOperation().getName().equals(ops[i])) {
-                            operationType.setSelection(i);
+                            operationType.setSelection(i, false);
                             break;
                         }
                     }
@@ -207,30 +207,35 @@ public class PolicyActivity extends AppCompatActivity {
                 case "connected-wlan":
                     contextType.setSelection(2);
                     operationType.setAdapter(new ArrayAdapter<String>(PolicyActivity.this, android.R.layout.simple_spinner_item, getResources().getStringArray(R.array.op_connected_wlan)));
-                    operationType.setSelection(0);
+                    operationType.setSelection(0, false);
                     break;
                 case "paired-bluetooth":
                     contextType.setSelection(3);
                     operationType.setAdapter(new ArrayAdapter<String>(PolicyActivity.this, android.R.layout.simple_spinner_item, getResources().getStringArray(R.array.op_paired_bluetooth)));
-                    operationType.setSelection(0);
+                    operationType.setSelection(0, false);
                     break;
                 case "nfc-id":
                     contextType.setSelection(4);
                     operationType.setAdapter(new ArrayAdapter<String>(PolicyActivity.this, android.R.layout.simple_spinner_item, getResources().getStringArray(R.array.op_nfc_id)));
-                    operationType.setSelection(0);
+                    operationType.setSelection(0, false);
                     break;
                 case "user-role-nearby-wlan":
                     contextType.setSelection(5);
                     operationType.setAdapter(new ArrayAdapter<String>(PolicyActivity.this, android.R.layout.simple_spinner_item, getResources().getStringArray(R.array.op_user_role_nearby_wlan)));
-                    operationType.setSelection(0);
+                    operationType.setSelection(0, false);
                     break;
                 default:
                     break;
             }
 
             contextType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                boolean stop = true;
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    if (stop) { /*Stop initial invoke*/
+                        stop = false;
+                        return;
+                    }
                     switch (position) {
                         case 0:
                             operationType.setAdapter(new ArrayAdapter<String>(PolicyActivity.this, android.R.layout.simple_spinner_item, op_location));
