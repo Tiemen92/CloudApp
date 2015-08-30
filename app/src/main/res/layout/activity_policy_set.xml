@@ -1,0 +1,90 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:weightSum="1"
+    android:orientation="vertical"
+
+    tools:context="be.tiemencelis.cloudapp.PolicySetActivity">
+
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="0dp"
+        android:layout_weight="0.1"
+        android:layout_marginTop="5dip"
+        android:id="@+id/policysettoplayout">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Resolver:"
+            android:padding="10dp"
+            android:id="@+id/resolver_type"
+            android:textAppearance="?android:attr/textAppearanceMedium" />
+
+        <Spinner
+            android:layout_width="0dp"
+            android:layout_weight="0.20"
+            android:layout_height="wrap_content"
+            android:id="@+id/resolver_type_input"
+            android:entries="@array/resolver_types"/>
+
+        <Switch
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:textOff="Or"
+            android:textOn="And"
+            android:id="@+id/combine_switch"
+            android:showText="true" />
+
+    </LinearLayout>
+
+    <View
+        android:layout_width="fill_parent"
+        android:layout_height="3dp"
+        android:id="@+id/line"
+        android:layout_below="@+id/policytoplayout"
+        android:background="@android:color/darker_gray"/>
+
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="0dp"
+        android:layout_weight="0.78">
+
+        <ListView
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/policyitems" >
+        </ListView>
+
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/policysetbuttons"
+        android:layout_height="0dp"
+        android:layout_weight="0.12"
+        android:orientation="horizontal"
+        android:layout_width="fill_parent"
+        android:layout_gravity="bottom"
+        android:layout_alignParentBottom="true"
+        android:layout_margin="5dp">
+        <Button
+            android:id="@+id/save_policyset"
+            android:text="Save"
+            android:layout_width="0dip"
+            android:layout_height="60dip"
+            android:layout_weight="1"
+            android:layout_marginRight="2.5dp">
+        </Button>
+        <Button
+            android:id="@+id/cancel_policyset"
+            android:text="Cancel"
+            android:layout_width="0dip"
+            android:layout_height="60dip"
+            android:layout_weight="1"
+            android:layout_marginLeft="2.5dp">
+        </Button>
+    </LinearLayout>
+
+
+</LinearLayout>

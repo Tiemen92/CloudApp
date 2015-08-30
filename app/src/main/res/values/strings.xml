@@ -1,4 +1,39 @@
 <resources>
     <string name="app_name">Cloud App</string>
-    <string name="title_activity_roles">RolesActivity</string>
+
+    <string-array name="item_types">
+        <item>context</item>
+        <item>idmx</item>
+        <item>x509</item>
+    </string-array>
+    <string-array name="trust_types">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+    </string-array>
+    <string-array name="resolver_types">
+        <item>Deny</item>
+        <item>Allow</item>
+        <item>Amount</item>
+    </string-array>
+    <string-array name="op_ntp">
+        <item>equals</item>
+        <item>before</item>
+        <item>after</item>
+        <item>between</item>
+        <item>weekday</item>
+        <item>weekend</item>
+    </string-array>
+    <string-array name="op_connected_wlan">
+        <item>equals</item>
+    </string-array>
+    <string-array name="op_paired_bluetooth">
+        <item>equals</item>
+    </string-array>
+    <string-array name="op_nfc_id">
+        <item>equals</item>
+    </string-array>
+    <string-array name="op_user_role_nearby_wlan">
+        <item>equals</item>
+    </string-array>
 </resources>

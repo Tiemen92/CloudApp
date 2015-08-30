@@ -6,7 +6,10 @@ import android.content.Intent;
 import android.net.Uri;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.view.ContextMenu;
 import android.view.LayoutInflater;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.MimeTypeMap;
@@ -22,6 +25,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 
+import be.tiemencelis.accesspolicy.PolicySet;
 import be.tiemencelis.beans.FileMeta;
 
 
@@ -29,6 +33,7 @@ public class FileBrowserActivity extends AppCompatActivity {
     private ArrayList<FileMeta> files;
     private String location;
     private String role;
+    private ListView list;
 
 
     @Override
@@ -43,8 +48,9 @@ public class FileBrowserActivity extends AppCompatActivity {
         files = (ArrayList<FileMeta>) b.getSerializable("files");
         setTitle("File browser: " + location);
 
-        ListView list = (ListView) findViewById(R.id.list);
+        list = (ListView) findViewById(R.id.list);
         list.setAdapter(new CustomListAdapter(this, files));
+        registerForContextMenu(list);
 
         list.setOnItemClickListener(new OnItemClickListener() {
             @Override
@@ -93,6 +99,39 @@ public class FileBrowserActivity extends AppCompatActivity {
         });
     }
 
+
+    @Override
+    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
+        super.onCreateContextMenu(menu, v, menuInfo);
+
+        MenuInflater menuInflater = getMenuInflater();
+        menuInflater.inflate(R.menu.contextual_menu, menu);
+    }
+
+    @Override
+    public boolean onContextItemSelected(MenuItem item) {
+        AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
+
+        switch (item.getItemId()) {
+            case R.id.id_delete:
+                //TODO delete file
+                break;
+            case R.id.id_edit_policy:
+                new Thread(new LoadPolicy(info.position, "w")).start();
+                break;
+            case R.id.id_get_policy:
+                new Thread(new LoadPolicy(info.position, "r")).start();
+                break;
+            case R.id.id_update_file:
+                //TODO select new file or change dir name
+                break;
+            default:
+                break;
+        }
+
+
+        return super.onContextItemSelected(item);
+    }
 
     /**
      * Load dir contents and launch new activity with it
@@ -170,6 +209,45 @@ public class FileBrowserActivity extends AppCompatActivity {
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+        }
+    }
+
+
+    /**
+     * Load policyset and launch new activity with it to possibly edit them
+     */
+    class LoadPolicy implements Runnable {
+        int position;
+        String action;
+        LoadPolicy(int position, String action) {this.position = position; this.action = action;}
+        @Override
+        public void run() {
+            PolicySet policySet = null;
+            Bundle b;
+            Intent i;
+            String loc = null;
+            try {
+                if (files.get(position).isDirectory()) {
+                    loc = new String(location + files.get(position).getName() + "/");
+                } else {
+                    loc = new String(location + files.get(position).getName());
+                }
+                policySet = CommunicationHandler.requestPolicySet(role, loc, action);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            if (policySet == null) {
+                showToast("Authentication failed");
+            } else {
+                b = new Bundle();
+                b.putString("location", loc);
+                b.putString("role", role);
+                b.putSerializable("policyset", policySet);
+                i = new Intent(FileBrowserActivity.this, PolicySetActivity.class);
+                i.putExtras(b);
+                startActivity(i);
             }
         }
     }

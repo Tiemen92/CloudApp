@@ -55,6 +55,17 @@
             </intent-filter>
         </receiver>
 
+        <activity
+            android:name=".PolicyActivity"
+            android:label="Policy"
+            android:windowSoftInputMode="adjustPan"
+            android:screenOrientation="portrait" >
+        </activity>
+        <activity
+            android:name=".PolicySetActivity"
+            android:label="PolicySet"
+            android:screenOrientation="portrait" >
+        </activity>
     </application>
 
 </manifest>

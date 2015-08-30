@@ -1,0 +1,80 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:orientation="vertical"
+    tools:context="be.tiemencelis.cloudapp.PolicyActivity">
+
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dip"
+        android:id="@+id/policytoplayout">
+
+        <Switch
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:textOff="Deny"
+            android:textOn="Allow"
+            android:id="@+id/effect_switch"
+            android:showText="true" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Min.:"
+            android:padding="10dp"
+            android:id="@+id/minimum"
+            android:textAppearance="?android:attr/textAppearanceMedium" />
+
+        <EditText
+            android:layout_height="wrap_content"
+            android:layout_width="0dp"
+            android:layout_weight="0.10"
+            android:id="@+id/minimum_input"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Age:"
+            android:padding="10dp"
+            android:id="@+id/age"
+            android:textAppearance="?android:attr/textAppearanceMedium" />
+
+        <EditText
+            android:layout_height="wrap_content"
+            android:layout_width="0dp"
+            android:layout_weight="0.10"
+            android:id="@+id/age_input"/>
+
+    </LinearLayout>
+
+    <View
+        android:layout_width="fill_parent"
+        android:layout_height="3dp"
+        android:id="@+id/line"
+        android:layout_below="@+id/policytoplayout"
+        android:background="@android:color/darker_gray"/>
+
+    <LinearLayout android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dip"
+        android:layout_marginBottom="5dip"
+        android:gravity="center"
+        android:layout_alignParentBottom="true"
+        android:layout_below="@+id/line"
+
+        android:id="@+id/policylayout">
+        <ListView
+            android:id="@+id/requirement_item_list"
+            android:layout_height="wrap_content"
+            android:layout_width="fill_parent"
+            android:divider="@color/material_blue_grey_800"
+            android:dividerHeight="2px"
+            android:descendantFocusability="beforeDescendants"
+            tools:listitem="@layout/requirement_item">
+        </ListView>
+    </LinearLayout>
+
+</RelativeLayout>

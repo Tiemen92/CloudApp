@@ -10,6 +10,7 @@ import com.ibm.zurich.idmx.dm.Nym;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FilenameFilter;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -246,7 +247,7 @@ public class CommunicationHandler {
 
 
     @SuppressWarnings("unchecked")
-    public static byte[] requestFileContents(String role, String location) throws Exception {
+     public static byte[] requestFileContents(String role, String location) throws Exception {
         byte[] result = null;
 
         Connection conn = cman.getConnection(cloudParam);
@@ -301,6 +302,126 @@ public class CommunicationHandler {
 
 
         return result;
+    }
+
+
+    @SuppressWarnings("unchecked")
+    public static PolicySet requestPolicySet(String role, String location, String action) throws Exception {
+        PolicySet result = null;
+
+        Connection conn = cman.getConnection(cloudParam);
+
+        ConnectInfo info = new ConnectInfo();
+        info.setAction(action);
+        info.setRel_location(location);
+        info.setRole(role);
+        AuthToken saved = ContextManager.getToken(role, location, action);
+        if (saved != null) {
+            System.out.println("Reusing saved token");
+            info.setAuthToken(saved);
+        }
+
+        conn.send("REQUEST_POLICY");
+        conn.send(info);
+
+        SendRoleProof(conn, role);
+
+        switch ((String) conn.receive()) {
+            case "OK":
+                System.out.println("Token valid: receiving PolicySet");
+                result = (PolicySet) conn.receive();
+                conn.receive(); //Receive external credential policies here, currently not used
+                conn.close();
+                break;
+            case "AUTHENTICATE":
+                System.out.println("Need to authenticate");
+                UUID session = (UUID) conn.receive();
+                conn.close();
+
+                AuthToken token = getToken(role, action, session);
+                if (token != null) {
+                    ContextManager.addToken(role + location, action, token);
+                    System.out.println("Token received and saved");
+                    conn = cman.getConnection(cloudParam);
+                    info.setAuthToken(token);
+
+                    conn.send("REQUEST_POLICY");
+                    conn.send(info);
+
+                    SendRoleProof(conn, role);
+
+                    if (conn.receive().equals("OK")) {
+                        System.out.println("Token valid: receiving contents");
+                        result = (PolicySet) conn.receive();
+                        conn.receive(); //Receive external credential policies here, currently not used
+                        conn.close();
+                    }
+                }
+                break;
+        }
+
+        return result;
+    }
+
+
+    @SuppressWarnings("unchecked")
+    public static boolean savePolicySet(String role, String location, PolicySet policySet) throws Exception {
+        PolicySet result = null;
+        String action = "w";
+
+        Connection conn = cman.getConnection(cloudParam);
+
+        ConnectInfo info = new ConnectInfo();
+        info.setAction(action);
+        info.setRel_location(location);
+        info.setRole(role);
+        AuthToken saved = ContextManager.getToken(role, location, action);
+        if (saved != null) {
+            System.out.println("Reusing saved token");
+            info.setAuthToken(saved);
+        }
+
+        conn.send("PUSH_POLICY");
+        conn.send(info);
+
+        SendRoleProof(conn, role);
+
+        switch ((String) conn.receive()) {
+            case "OK":
+                System.out.println("Token valid: receiving PolicySet");
+                conn.send(policySet);
+                conn.close();
+                return true;
+            case "AUTHENTICATE":
+                System.out.println("Need to authenticate");
+                UUID session = (UUID) conn.receive();
+                conn.close();
+
+                AuthToken token = getToken(role, action, session);
+                if (token != null) {
+                    ContextManager.addToken(role + location, action, token);
+                    System.out.println("Token received and saved");
+                    conn = cman.getConnection(cloudParam);
+                    info.setAuthToken(token);
+
+                    conn.send("PUSH_POLICY");
+                    conn.send(info);
+
+                    SendRoleProof(conn, role);
+
+                    if (conn.receive().equals("OK")) {
+                        System.out.println("Token valid: receiving contents");
+                        conn.send(policySet);
+                        conn.close();
+                        return true;
+                    }
+                }
+                break;
+            case "NOK":
+                return false;
+        }
+
+        return false;
     }
 
 
@@ -394,10 +515,10 @@ public class CommunicationHandler {
                         itemRes = handleContext(age, item, request.getCredentialNonces().get(item.getId()));
                         break;
                     case "x509":
-                        itemRes = handleX509(request.getCredentialPolicies().get(item.getId()));
+                        itemRes = handleX509(request.getCredentialPolicies().get(item.getId()), request.getCredentialNonces().get(item.getId()));
                         break;
                     case "idmx":
-                        itemRes = handleIdemix(request.getCredentialPolicies().get(item.getId()));
+                        itemRes = handleIdemix(request.getCredentialPolicies().get(item.getId()), request.getCredentialNonces().get(item.getId()));
                         break;
                     default:
                         System.out.println("Unsupported type \"" + item.getType() + "\" in requirementItem");
@@ -500,19 +621,99 @@ public class CommunicationHandler {
     }
 
 
-    private static RequirementItemResponse handleX509(String credential /*, Nonce nonce*/) { //TODO nonce
-        RequirementItemResponse response = null;
+    /**
+     * Create a response for an x509 item if possible
+     * @param credential x509 policy
+     * @param nonce nonce to be used in the policy
+     * @return RequirementItemResponse containing the proof, null if not possible or error. Encoded in Base64 after serialization
+     */
+    private static RequirementItemResponse handleX509(String credential , Nonce nonce) {
+        RequirementItemResponse response;
 
+        /*Load credentials*/
+        File credentialFolder = new File("/sdcard/CloudApp/credentials/");
+        FilenameFilter credsOnlyFilter = new FilenameFilter() {
+            public boolean accept(File dir, String name) {
+                return name.startsWith("cred_user_");
+            }
+        };
+        File[] credentials = credentialFolder.listFiles(credsOnlyFilter);
+        List<Credential> creds = new ArrayList<>();
+        for (File file : credentials) {
+            Credential cred = pman.load(file.toURI());
+            MasterSecret ms = new MasterSecret(((MasterSecret) pman.load(home.resolve("credentials/secret_" + file.getName().substring(10, file.getName().length()-4) + ".pem"))).getValue(),
+                    URI.create("http://cloudservers:8080/gp.xml"), new HashMap<String, Nym>(), new HashMap<String, DomNym>());
+            cred.setSecret(ms);
+            creds.add(cred);
+        }
 
+        /*Initialize x509 credential*/
+        be.kuleuven.cs.priman.credential.claim.representation.policy.Policy pol = spman.parsePolicy(credential);
+        pol.initialize(creds);
+        if (pol.getCredentialClaims().isEmpty()) {
+            System.out.println("No credential can be used to create a proof for the policy");
+            return null;
+        }
+
+        /*Create proof and add to response if possible*/
+        try {
+            Proof proof = credman.generateProof(pol.getClaim(), nonce);
+            response = new RequirementItemResponse();
+            response.addValue(SecurityHandler.encodeBase64(SecurityHandler.serialize(credman.serializeProof(proof))));
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("Exception when creating x509 proof for credential policy");
+            return null;
+        }
 
         return response;
     }
 
 
-    private static RequirementItemResponse handleIdemix(String credential /*, Nonce nonce*/) { //TODO nonce
-        RequirementItemResponse response = null;
+    /**
+     * Create a response for an idemix item if possible
+     * @param credential idemix policy
+     * @param nonce nonce to be used in the proof
+     * @return RequirementItemResponse containing the proof, null if not possible or error. Encoded in Base64 after serialization
+     */
+    private static RequirementItemResponse handleIdemix(String credential , Nonce nonce) {
+        RequirementItemResponse response;
 
+        /*Load credentials*/
+        File credentialFolder = new File("/sdcard/CloudApp/credentials/");
+        FilenameFilter credsOnlyFilter = new FilenameFilter() {
+            public boolean accept(File dir, String name) {
+                return name.startsWith("cred_user_");
+            }
+        };
+        File[] credentials = credentialFolder.listFiles(credsOnlyFilter);
+        List<Credential> creds = new ArrayList<>();
+        for (File file : credentials) {
+            Credential cred = pman.load(file.toURI());
+            MasterSecret ms = new MasterSecret(((MasterSecret) pman.load(home.resolve("credentials/secret_" + file.getName().substring(10, file.getName().length()-4) + ".xml"))).getValue(),
+                    URI.create("http://cloudservers:8080/gp.xml"), new HashMap<String, Nym>(), new HashMap<String, DomNym>());
+            cred.setSecret(ms);
+            creds.add(cred);
+        }
 
+        /*Initialize idemix credential*/
+        be.kuleuven.cs.priman.credential.claim.representation.policy.Policy pol = spman.parsePolicy(credential);
+        pol.initialize(creds);
+        if (pol.getCredentialClaims().isEmpty()) {
+            System.out.println("No credential can be used to create a proof for the policy");
+            return null;
+        }
+
+        /*Create proof and add to response if possible*/
+        try {
+            Proof proof = credman.generateProof(pol.getClaim(), nonce);
+            response = new RequirementItemResponse();
+            response.addValue(SecurityHandler.encodeBase64(SecurityHandler.serialize(credman.serializeProof(proof))));
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("Exception when creating idemix proof for credential policy");
+            return null;
+        }
 
         return response;
     }
