@@ -1,5 +1,10 @@
 package be.tiemencelis.cloudapp;
 
+/**
+ * Created by Tiemen on 12-5-2015.
+ * Activity for showing the different roles the smartphone owns
+ */
+
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -26,7 +31,6 @@ import java.util.List;
 
 import be.tiemencelis.beans.FileMeta;
 import be.tiemencelis.context.ContextManager;
-import be.tiemencelis.context.NfcActivity;
 
 
 public class RolesActivity extends AppCompatActivity {
@@ -38,12 +42,13 @@ public class RolesActivity extends AppCompatActivity {
         LoadRoles();
     }
 
-
     public static List<String> getRoles() {
         return roles;
     }
 
-
+    /**
+     * Load all the roles the smartphone owns
+     */
     private void LoadRoles() {
         File credentialFolder = new File("/sdcard/CloudApp/credentials/");
         FilenameFilter credsOnlyFilter = new FilenameFilter() {
@@ -74,12 +79,18 @@ public class RolesActivity extends AppCompatActivity {
 
         ContextManager.init(this);
 
+        /**
+         * onClick handler when a role is selected, load the root dir of the selected role
+         */
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 new Thread(new LoadContents(position)).start();
             }
 
+            /**
+             * Load the contents of the root dir of a role
+             */
             class LoadContents implements Runnable {
                 int position;
 
@@ -98,9 +109,12 @@ public class RolesActivity extends AppCompatActivity {
                         e.printStackTrace();
                     }
 
+                    /*No access rights for the directory*/
                     if (files == null) {
                         showToast("Authentication failed");
-                    } else {
+                    }
+                    /*Directory contents received, show them in a FileBrowserActivity*/
+                    else {
                         b = new Bundle();
                         b.putString("location", "/");
                         b.putString("role", roles.get(position));
@@ -113,8 +127,7 @@ public class RolesActivity extends AppCompatActivity {
             }
         });
 
-
-
+        /*onClick handler for creating a new account and/or credential*/
         Button createButton = (Button) findViewById(R.id.bCreate);
         createButton.setOnClickListener(new View.OnClickListener() {
 
@@ -125,6 +138,7 @@ public class RolesActivity extends AppCompatActivity {
                 final EditText input = (EditText) layout.findViewById(R.id.editTextDialog);
                 input.setTransformationMethod(android.text.method.SingleLineTransformationMethod.getInstance());
 
+                /*Dialog for entering the required info to create a new account/credential*/
                 new AlertDialog.Builder(RolesActivity.this)
                         .setTitle("Create account")
                         .setMessage("Enter your name/role here:")
@@ -149,27 +163,30 @@ public class RolesActivity extends AppCompatActivity {
                             }
                         })
                         .create().show();
-
-                /*TODO check nfc use*/
-                //Intent i = new Intent(RolesActivity.this, NfcActivity.class);
-                //startActivity(i);
             }
         });
     }
 
-
-
+    /**
+     * Request a credential and optionally also create an account with it
+     * @param name name of the new account (role/username)
+     * @param credentialOnly boolean if only a credential is needed or also an account
+     * @param admin if admin rights are required for this account or not (only used when account is created)
+     */
     public void createAccount(final String name, final boolean credentialOnly, final int admin) {
         (new Runnable() {
             public void run() {
                 try {
+                    /*Onyl credential*/
                     if (credentialOnly) {
                         if (CommunicationHandler.requestCredential(name)) {
                             showToast("Credential successfully created");
                         } else {
                             showToast("Error requesting credential");
                         }
-                    } else {
+                    }
+                    /*Credential and account*/
+                    else {
                         if (CommunicationHandler.createAccount(name, admin)) {
                             showToast("Account successfully created");
                         } else {
@@ -183,7 +200,10 @@ public class RolesActivity extends AppCompatActivity {
         }).run();
     }
 
-
+    /**
+     * Show toast message
+     * @param toast message
+     */
     public void showToast(final String toast) {
         runOnUiThread(new Runnable() {
             public void run() {
@@ -198,7 +218,4 @@ public class RolesActivity extends AppCompatActivity {
         ContextManager.tearDown();
         super.onDestroy();
     }
-
-
-
 }

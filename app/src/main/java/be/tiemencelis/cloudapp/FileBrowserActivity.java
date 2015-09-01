@@ -76,6 +76,7 @@ public class FileBrowserActivity extends AppCompatActivity {
             }
         });
 
+        /*onClick event for the share button*/
         Button shareButton = (Button) findViewById(R.id.bShare); /*TODO new policies ipv copy*/
         shareButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -85,6 +86,7 @@ public class FileBrowserActivity extends AppCompatActivity {
                 final EditText input = (EditText) layout.findViewById(R.id.editTextDialog);
                 input.setTransformationMethod(android.text.method.SingleLineTransformationMethod.getInstance());
 
+                /*Create an alert and ask for necessary information for sharing the data*/
                 new AlertDialog.Builder(FileBrowserActivity.this)
                         .setTitle("Share folder")
                         .setMessage("Enter role/username to share with:")
@@ -107,6 +109,12 @@ public class FileBrowserActivity extends AppCompatActivity {
     }
 
 
+    /**
+     * Context menu when long press on a file/dir item
+     * @param menu
+     * @param v
+     * @param menuInfo
+     */
     @Override
     public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
         super.onCreateContextMenu(menu, v, menuInfo);
@@ -115,6 +123,11 @@ public class FileBrowserActivity extends AppCompatActivity {
         menuInflater.inflate(R.menu.contextual_menu, menu);
     }
 
+    /**
+     * Handle selected item from context menu (delete and update not yet supported)
+     * @param item
+     * @return
+     */
     @Override
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
@@ -135,8 +148,6 @@ public class FileBrowserActivity extends AppCompatActivity {
             default:
                 break;
         }
-
-
         return super.onContextItemSelected(item);
     }
 
@@ -157,9 +168,12 @@ public class FileBrowserActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
 
+            /*No access rights received for this directory*/
             if (newFiles == null) {
                 showToast("Authentication failed");
-            } else {
+            }
+            /*Contents received, launch new activity to show them*/
+            else {
                 b = new Bundle();
                 b.putString("location", location + files.get(position).getName() + "/");
                 b.putString("role", role);
@@ -184,15 +198,19 @@ public class FileBrowserActivity extends AppCompatActivity {
             try {
                 content = CommunicationHandler.requestFileContents(role, location + files.get(position).getName());
 
+                /*No access rights received for this file*/
                 if (content == null) {
                     showToast("Authentication failed");
-                } else {
+                }
+                /*File received, launch it with the appropriate application*/
+                else {
+                    /*Save received file*/
                     BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream("/sdcard/CloudApp/data/" + files.get(position).getName()));
                     bos.write(content);
                     bos.flush();
                     bos.close();
 
-
+                    /*Launch app for file type or chooser with possible apps to open the file*/
                     Intent viewIntent = new Intent(Intent.ACTION_VIEW);
                     Intent editIntent = new Intent(Intent.ACTION_EDIT);
                     MimeTypeMap myMime = MimeTypeMap.getSingleton();
@@ -235,6 +253,7 @@ public class FileBrowserActivity extends AppCompatActivity {
             Intent i;
             String loc = null;
             try {
+                /*Create location path based on type (dir or file)*/
                 if (files.get(position).isDirectory()) {
                     loc = new String(location + files.get(position).getName() + "/");
                 } else {
@@ -245,9 +264,12 @@ public class FileBrowserActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
 
+            /*access rights received for the requested policy*/
             if (policySet == null) {
                 showToast("Authentication failed");
-            } else {
+            }
+            /*Policy received, laucnh activity to show it*/
+            else {
                 b = new Bundle();
                 b.putString("location", loc);
                 b.putString("role", role);
@@ -260,6 +282,10 @@ public class FileBrowserActivity extends AppCompatActivity {
     }
 
 
+    /**
+     * Handle the sharing of data with another user
+     * @param shareRole user to share with
+     */
     public void shareData(final String shareRole) {
         (new Runnable() {
             public void run() {
@@ -275,6 +301,10 @@ public class FileBrowserActivity extends AppCompatActivity {
     }
 
 
+    /**
+     * Show toast message
+     * @param toast message
+     */
     public void showToast(final String toast) {
         runOnUiThread(new Runnable() {
             public void run()
@@ -283,6 +313,5 @@ public class FileBrowserActivity extends AppCompatActivity {
             }
         });
     }
-
 
 }

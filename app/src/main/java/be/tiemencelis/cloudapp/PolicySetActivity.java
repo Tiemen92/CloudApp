@@ -1,5 +1,10 @@
 package be.tiemencelis.cloudapp;
 
+/**
+ * Created by Tiemen on 26-8-2015.
+ * Activity for showing the different policies in a PolicySet
+ */
+
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
@@ -14,7 +19,6 @@ import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.Toast;
 
-import be.tiemencelis.accesspolicy.AccessPolicyParser;
 import be.tiemencelis.accesspolicy.Policy;
 import be.tiemencelis.accesspolicy.PolicySet;
 
@@ -95,12 +99,33 @@ public class PolicySetActivity extends AppCompatActivity {
         save.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                /*Update combineLogic value*/
+                if (combineSwitch.isChecked()) {
+                    policySet.setCombineLogic("and");
+                } else {
+                    policySet.setCombineLogic("or");
+                }
+                /*Update effectResolver value*/
+                switch (resolverSpinner.getSelectedItemPosition()) {
+                    case 0:
+                        policySet.setEffectResolver("deny-overrules");
+                        break;
+                    case 1:
+                        policySet.setEffectResolver("allow-overrules");
+                        break;
+                    case 2:
+                        policySet.setEffectResolver("amount-overrules");
+                        break;
+                    default:
+                        break;
+                }
+                /*Push new PolicySet to the server to save*/
                 new Thread(new SavePolicy()).start();
                 onBackPressed();
             }
         });
 
-        /*Cancel edit*/
+        /*Cancel edit, discard changes*/
         cancel = (Button) findViewById(R.id.cancel_policyset);
         cancel.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -112,8 +137,10 @@ public class PolicySetActivity extends AppCompatActivity {
     }
 
 
+    /**
+     * Save all changes made to the PolicySet and containing Policies by pushing to the server
+     */
     class SavePolicy implements Runnable {
-
         @Override
         public void run() {
             try {
@@ -129,6 +156,12 @@ public class PolicySetActivity extends AppCompatActivity {
     }
 
 
+    /**
+     * Receive changes from a PolicyActivity and save them in the PolicySet
+     * @param requestCode
+     * @param resultCode
+     * @param data
+     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -141,6 +174,11 @@ public class PolicySetActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Show a toast message
+     * @param toast message
+     * @param toast message
+     */
     public void showToast(final String toast) {
         runOnUiThread(new Runnable() {
             public void run() {

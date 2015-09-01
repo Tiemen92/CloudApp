@@ -1,5 +1,10 @@
 package be.tiemencelis.cloudapp;
 
+/**
+ * Created by Tiemen on 26-8-2015.
+ * Activity for showing the different items in a Policy
+ */
+
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
@@ -17,7 +22,6 @@ import android.widget.Switch;
 import java.util.List;
 import java.util.UUID;
 
-import be.tiemencelis.accesspolicy.AccessPolicyParser;
 import be.tiemencelis.accesspolicy.Operation;
 import be.tiemencelis.accesspolicy.Policy;
 import be.tiemencelis.accesspolicy.RequirementData;
@@ -61,6 +65,10 @@ public class PolicyActivity extends AppCompatActivity {
         list.setAdapter(new PolicyListAdapter(this, policy.getRequirementItems()));
     }
 
+    /**
+     * Load all data of all the items, build a new Policy item with it
+     * and return it to the previous activity (PolicySetActivity) to save the changes
+     */
     @Override
     public void onBackPressed() {
         /*Save changes*/
@@ -75,6 +83,7 @@ public class PolicyActivity extends AppCompatActivity {
         }
         newPol.setMinimum(Integer.parseInt(minimum.getText().toString()));
 
+        /*Handle every element (RequirementItem) separately and read all the values (spinners, switches, edittexts)*/
         for (int i = 0; i < list.getCount(); i++) {
             RequirementItem item = new RequirementItem();
             View v = list.getChildAt(i);
@@ -122,6 +131,7 @@ public class PolicyActivity extends AppCompatActivity {
             newPol.addRequirementItem(item);
         }
 
+        /*Send new Policy to previous activity*/
         Bundle bundle = new Bundle();
         bundle.putSerializable("policy", newPol);
         bundle.putInt("id", id);
@@ -146,6 +156,13 @@ public class PolicyActivity extends AppCompatActivity {
             this.items = items;
         }
 
+        /**
+         * Fill a single item (RequirementItem) from the list
+         * @param position
+         * @param view
+         * @param parent
+         * @return
+         */
         public View getView(int position,View view,ViewGroup parent) {
             LayoutInflater inflater=context.getLayoutInflater();
             View rowView=inflater.inflate(R.layout.requirement_item, null, true);
@@ -228,6 +245,7 @@ public class PolicyActivity extends AppCompatActivity {
                     break;
             }
 
+            /*Update operation spinner items when context type changes*/
             contextType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 boolean stop = true;
                 @Override
@@ -279,5 +297,4 @@ public class PolicyActivity extends AppCompatActivity {
             return rowView;
         }
     }
-
 }

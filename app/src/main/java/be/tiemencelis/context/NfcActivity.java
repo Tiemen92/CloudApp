@@ -1,5 +1,11 @@
 package be.tiemencelis.context;
 
+/**
+ * Created by Tiemen on 1-6-2015.
+ * Invisible activity for detecting nfc tags on the background
+ * Not yet extensively tested!
+ */
+
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.Intent;

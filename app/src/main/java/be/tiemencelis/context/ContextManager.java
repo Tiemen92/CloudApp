@@ -1,5 +1,12 @@
 package be.tiemencelis.context;
 
+/**
+ * Created by Tiemen on 18-5-2015.
+ * Provides interface for requesting all kinds of contextinformation and saved tokens
+ * Also stores cached contextinformation for improved speed and battery consumption
+ * Final task is broadcasting device and detecting other devices for requesting external context
+ */
+
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
@@ -26,7 +33,6 @@ import com.ibm.zurich.idmx.dm.MasterSecret;
 import com.ibm.zurich.idmx.dm.Nym;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
@@ -35,7 +41,6 @@ import java.net.URI;
 import java.security.PublicKey;
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,13 +57,6 @@ import be.kuleuven.cs.priman.manager.ServerPolicyManager;
 import be.tiemencelis.beans.AuthToken;
 import be.tiemencelis.cloudapp.RolesActivity;
 import be.tiemencelis.security.SecurityHandler;
-
-
-/**
- * Created by Tiemen on 18-5-2015.
- * Provides interface for requesting all kinds of contextinformation and saved tokens
- * Also stores cached contextinformation for improved speed and battery consumption
- */
 
 public class ContextManager extends BroadcastReceiver {
     private static final int FIVE_MINUTES = 1000 * 60 * 5;
@@ -129,15 +127,16 @@ public class ContextManager extends BroadcastReceiver {
         lanClients = new HashMap<>();
         credIssuerServer = new CredentialIssuer();
 
-        //System.out.println("Port: " + PORT);
-        //registerService(PORT);
-
         /*Request ntp time as init value*/
         try {
             lastNtpTime = getNtpTime(0);
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        /*TODO enable for detecting nfc tags*/
+        //Intent i = new Intent(RolesActivity.this, NfcActivity.class);
+        //startActivity(i);
     }
 
 
@@ -190,6 +189,7 @@ public class ContextManager extends BroadcastReceiver {
             return lastNtpTime;
         }
 
+        /*Request new ntp time from external ntp server*/
         try {
             lastNtpTime = Time.getNtpTime();
             System.out.println("System time: " + System.currentTimeMillis());
@@ -292,6 +292,13 @@ public class ContextManager extends BroadcastReceiver {
     }
 
 
+    /**
+     * Request a stored access token for certain role, action and file/dir
+     * @param role role for the searched token
+     * @param relPath path for the searched token
+     * @param action action for the searched token
+     * @return access token if found, otherwise null
+     */
     public static AuthToken getToken(String role, String relPath, String action) {
         Map.Entry<String, String> entry = new AbstractMap.SimpleEntry<>(role + relPath, action);
 
@@ -349,10 +356,6 @@ public class ContextManager extends BroadcastReceiver {
         public void onLocationChanged(Location location) {
             if (isBetterLocation(location, lastLocation)) {
                 lastLocation = location;
-                //System.out.println("New location (better): " + location.toString());
-            }
-            else {
-                //System.out.println("New location (worse): " + location.toString());
             }
         }
 
@@ -432,6 +435,13 @@ public class ContextManager extends BroadcastReceiver {
     }
 
 
+    /**
+     * Request an external role proof
+     * @param role role that is searched
+     * @param nonce nonce the external user needs to use for the proof generation
+     * @return Encrypted role proof in Base64 representation
+     * @throws Exception
+     */
     public static String getCredentialProof(String role, Nonce nonce) throws Exception {
         Map.Entry<String, Integer> client = getFirstLanClient();
         if (client == null) {
@@ -488,6 +498,9 @@ public class ContextManager extends BroadcastReceiver {
     }
 
 
+    /**
+     * Listener and handler for external users who request a role proof
+     */
     private static class CredentialIssuer {
         ServerSocket serverSocket = null;
         Thread mThread = null;
@@ -511,6 +524,9 @@ public class ContextManager extends BroadcastReceiver {
             mThread.start();
         }
 
+        /**
+         * Handle incoming connections for requesting a role proof
+         */
         class IssuerThread implements Runnable {
             @Override
             public void run() {
@@ -554,7 +570,7 @@ public class ContextManager extends BroadcastReceiver {
                         Policy pol = spman.parsePolicy(dIn.readUTF());
                         System.out.println(pol.toString());
 
-                        /*Create and send proof*/
+                        /*Create and send encrypted proof (Base64 encoding over encryption)*/
                         pol.initialize(creds);
                         if (pol.getCredentialClaims().isEmpty()) {
                             System.out.println("Can not satisfy claim");
@@ -581,9 +597,7 @@ public class ContextManager extends BroadcastReceiver {
 
     /**
      * Client and server code for discovering other CloudApp devices on the network below
-     *
      */
-
     public static void registerService(int port) {
         NsdServiceInfo serviceInfo = new NsdServiceInfo();
         serviceInfo.setServiceName(SERVICE_NAME);
@@ -686,8 +700,6 @@ public class ContextManager extends BroadcastReceiver {
     };
 
 
-
-    //private static NsdManager.ResolveListener mResolveListener =;
     private static class MyResolveListener implements NsdManager.ResolveListener {
 
         @Override
@@ -707,6 +719,11 @@ public class ContextManager extends BroadcastReceiver {
     }
 
 
+    /**
+     * Cache external host, currently only 1 is kept for demo purposes
+     * @param host host ip
+     * @param port host listener port
+     */
     synchronized private static void addLanClient(String host, int port) {
         if (!lanClients.isEmpty()) {
             lanClients.clear();
@@ -715,6 +732,10 @@ public class ContextManager extends BroadcastReceiver {
     }
 
 
+    /**
+     * Get the first external client which is already found
+     * @return ip and port of the external host in a Map.Entry
+     */
     synchronized public static Map.Entry<String, Integer> getFirstLanClient() {
         if (lanClients.isEmpty()) {
             System.out.println("No lan clients in list to get");
@@ -728,6 +749,4 @@ public class ContextManager extends BroadcastReceiver {
         mNsdManager.unregisterService(mRegistrationListener);
         mNsdManager.stopServiceDiscovery(mDiscoveryListener);
     }
-
-
 }
