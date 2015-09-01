@@ -2,7 +2,7 @@ package be.tiemencelis.cloudapp;
 
 /**
  * Created by Tiemen on 12-5-2015.
- *
+ * Handler for filling the listview of the filebrowseractivity with custom made items (mylist.xml)
  */
 
 import android.app.Activity;

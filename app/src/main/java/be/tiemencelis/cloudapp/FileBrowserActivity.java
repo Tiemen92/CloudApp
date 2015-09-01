@@ -1,5 +1,10 @@
 package be.tiemencelis.cloudapp;
 
+/**
+ * Created by Tiemen on 12-5-2015.
+ * Activity for showing files and directories
+ */
+
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -42,6 +47,7 @@ public class FileBrowserActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_file_browser);
 
+        /*Load data to show*/
         Bundle b = getIntent().getExtras();
         location = b.getString("location");
         role = b.getString("role");
@@ -52,6 +58,7 @@ public class FileBrowserActivity extends AppCompatActivity {
         list.setAdapter(new CustomListAdapter(this, files));
         registerForContextMenu(list);
 
+        /*onClick event on listitem (file or dir)*/
         list.setOnItemClickListener(new OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {

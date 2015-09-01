@@ -9,11 +9,9 @@ import com.ibm.zurich.idmx.dm.MasterSecret;
 import com.ibm.zurich.idmx.dm.Nym;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +44,7 @@ import be.tiemencelis.security.SecurityHandler;
 
 /**
  * Created by Tiemen on 12-5-2015.
- *
+ * Used for handling all communication of the app: requesting data, policies, authentication, token request, ...
  */
 public class CommunicationHandler {
     private static final Priman priman = Priman.getInstance();
@@ -60,6 +58,13 @@ public class CommunicationHandler {
     private static final SSLParameters caParam = pman.load(home.resolve("app_data/caConnection-ssl.param"));
 
 
+    /**
+     * Create a new account on the cloud system
+     * @param role name of the new account
+     * @param admin admin rights or not
+     * @return true if successful
+     * @throws Exception
+     */
     public static boolean createAccount(String role, int admin) throws Exception {
         Connection conn = cman.getConnection(cloudParam);
 
@@ -101,6 +106,12 @@ public class CommunicationHandler {
     }
 
 
+    /**
+     * Request a credential for a role or username from the CA
+     * @param role role/username for the credential
+     * @return true if successful
+     * @throws Exception
+     */
     public static boolean requestCredential(String role) throws Exception {
         Connection conn = cman.getConnection(caParam);
         IssuanceSpecification ispec = pman.load(home.resolve("app_data/idmxIssuanceSpecification.xml"));
@@ -120,9 +131,17 @@ public class CommunicationHandler {
 
 
     /*TODO new policy ipv copy*/
+    /**
+     * Share data with another user or role. Currently only with the same policies
+     * @param role current role to be used for the sharing
+     * @param shareRole destination role, account that will receive access to the data
+     * @param location full path the user knows of the data to share
+     * @throws Exception
+     */
     public static void shareData(String role, String shareRole, String location) throws Exception {
         Connection conn = cman.getConnection(cloudParam);
 
+        /*Gather connect info and possible saved token*/
         ConnectInfo info = new ConnectInfo();
         info.setAction("r");
         info.setRel_location(location);
@@ -133,12 +152,15 @@ public class CommunicationHandler {
             info.setAuthToken(saved);
         }
 
+        /*Start share data process*/
         conn.send("SHARE_DATA");
         conn.send(info);
 
+        /*Proof of role*/
         SendRoleProof(conn, role);
 
         switch ((String) conn.receive()) {
+            /*Token is accepted and data will be shared*/
             case "OK":
                 System.out.println("Token valid: send role name to share with");
                 conn.send("COPY");
@@ -149,22 +171,27 @@ public class CommunicationHandler {
                 }
                 conn.close();
                 break;
+            /*Invalid token, request one first and retry*/
             case "AUTHENTICATE":
                 System.out.println("Need to authenticate");
                 UUID session = (UUID) conn.receive();
                 conn.close();
 
+                /*Request token from verification server*/
                 AuthToken token = getToken(role, "r", session);
                 if (token != null) {
+                    /*Save token*/
                     ContextManager.addToken(role + location, "r", token);
                     System.out.println("Token received and saved");
                     conn = cman.getConnection(cloudParam);
                     info.setAuthToken(token);
 
+                    /*Retry share process*/
                     conn.send("SHARE_DATA");
                     conn.send(info);
                     SendRoleProof(conn, role);
 
+                    /*Token and proof correct, data will be shared*/
                     if (conn.receive().equals("OK")) {
                         System.out.println("Token valid: send role name to share with");
                         conn.send("COPY");
@@ -180,6 +207,7 @@ public class CommunicationHandler {
                     conn.close();
                 }
                 break;
+            /*User has no admin rights*/
             default:
                 System.out.println("No admin rights, data sharing denied");
                 conn.close();
@@ -188,11 +216,19 @@ public class CommunicationHandler {
     }
 
 
+    /**
+     * Request the contents of a directory
+     * @param role role currently using
+     * @param location relative path of the directory
+     * @return List of FileMeta objects which represents metadata info of every file/dir
+     * @throws Exception
+     */
     @SuppressWarnings("unchecked")
     public static ArrayList<FileMeta> requestDirectoryContents(String role, String location) throws Exception {
         ArrayList<FileMeta> result = null;
         Connection conn = cman.getConnection(cloudParam);
 
+        /*Gather connect info and possible saved token*/
         ConnectInfo info = new ConnectInfo();
         info.setAction("r");
         info.setRel_location(location);
@@ -203,22 +239,27 @@ public class CommunicationHandler {
             info.setAuthToken(saved);
         }
 
+        /*Start request data process*/
         conn.send("REQUEST_FILE");
         conn.send(info);
 
+        /*Authenticate role*/
         SendRoleProof(conn, role);
 
         switch ((String) conn.receive()) {
+            /*Token correct, receive content*/
             case "OK":
                 System.out.println("Token valid: receiving contents");
                 result = (ArrayList<FileMeta>) conn.receive();
                 conn.close();
                 break;
+            /*Authorization is needed, request a token first*/
             case "AUTHENTICATE":
                 System.out.println("Need to authenticate");
                 UUID session = (UUID) conn.receive();
                 conn.close();
 
+                /*Request a token from the verification server*/
                 AuthToken token = getToken(role, "r", session);
                 if (token != null) {
                     ContextManager.addToken(role + location, "r", token);
@@ -227,6 +268,7 @@ public class CommunicationHandler {
                     conn = cman.getConnection(cloudParam);
                     info.setAuthToken(token);
 
+                    /*Retry request process*/
                     conn.send("REQUEST_FILE");
                     conn.send(info);
 
@@ -246,12 +288,20 @@ public class CommunicationHandler {
     }
 
 
+    /**
+     * Request a file
+     * @param role role to be used for the request
+     * @param location relative path of the file
+     * @return full contents of the file as a byte array
+     * @throws Exception
+     */
     @SuppressWarnings("unchecked")
      public static byte[] requestFileContents(String role, String location) throws Exception {
         byte[] result = null;
 
         Connection conn = cman.getConnection(cloudParam);
 
+        /*Gather connect info and possible saved token*/
         ConnectInfo info = new ConnectInfo();
         info.setAction("r");
         info.setRel_location(location);
@@ -262,22 +312,27 @@ public class CommunicationHandler {
             info.setAuthToken(saved);
         }
 
+        /*Start request process*/
         conn.send("REQUEST_FILE");
         conn.send(info);
 
+        /*Authenticate role*/
         SendRoleProof(conn, role);
 
         switch ((String) conn.receive()) {
+            /*Token correct, receive file*/
             case "OK":
                 System.out.println("Token valid: receiving contents");
                 result = (byte[]) conn.receive();
                 conn.close();
                 break;
+            /*Authorization is needed, request a token first*/
             case "AUTHENTICATE":
                 System.out.println("Need to authenticate");
                 UUID session = (UUID) conn.receive();
                 conn.close();
 
+                /*Request a token from the verification server*/
                 AuthToken token = getToken(role, "r", session);
                 if (token != null) {
                     ContextManager.addToken(role + location, "r", token);
@@ -285,6 +340,7 @@ public class CommunicationHandler {
                     conn = cman.getConnection(cloudParam);
                     info.setAuthToken(token);
 
+                    /*Retry request process*/
                     conn.send("REQUEST_FILE");
                     conn.send(info);
 
@@ -300,17 +356,25 @@ public class CommunicationHandler {
                 break;
         }
 
-
         return result;
     }
 
 
+    /**
+     * Request the access policy for a certain file or directory
+     * @param role role to be used
+     * @param location relative location of the file/dir of which the policy is requested
+     * @param action whether the read or write policy is requested
+     * @return Full PolicySet, external credentials currently not supported and ignored (but still received)
+     * @throws Exception
+     */
     @SuppressWarnings("unchecked")
     public static PolicySet requestPolicySet(String role, String location, String action) throws Exception {
         PolicySet result = null;
 
         Connection conn = cman.getConnection(cloudParam);
 
+        /*Gather connect info and possible saved token*/
         ConnectInfo info = new ConnectInfo();
         info.setAction(action);
         info.setRel_location(location);
@@ -321,23 +385,28 @@ public class CommunicationHandler {
             info.setAuthToken(saved);
         }
 
+        /*Start request policy process*/
         conn.send("REQUEST_POLICY");
         conn.send(info);
 
+        /*Authenticate role*/
         SendRoleProof(conn, role);
 
         switch ((String) conn.receive()) {
+            /*Token correct, receive PolicySet*/
             case "OK":
                 System.out.println("Token valid: receiving PolicySet");
                 result = (PolicySet) conn.receive();
                 conn.receive(); //Receive external credential policies here, currently not used
                 conn.close();
                 break;
+            /*Authorization is needed, request a token first*/
             case "AUTHENTICATE":
                 System.out.println("Need to authenticate");
                 UUID session = (UUID) conn.receive();
                 conn.close();
 
+                /*Request a token from the verification server*/
                 AuthToken token = getToken(role, action, session);
                 if (token != null) {
                     ContextManager.addToken(role + location, action, token);
@@ -345,6 +414,7 @@ public class CommunicationHandler {
                     conn = cman.getConnection(cloudParam);
                     info.setAuthToken(token);
 
+                    /*Retry request policy process*/
                     conn.send("REQUEST_POLICY");
                     conn.send(info);
 
@@ -353,7 +423,7 @@ public class CommunicationHandler {
                     if (conn.receive().equals("OK")) {
                         System.out.println("Token valid: receiving contents");
                         result = (PolicySet) conn.receive();
-                        conn.receive(); //Receive external credential policies here, currently not used
+                        conn.receive(); //TODO Receive external credential policies here, currently not used
                         conn.close();
                     }
                 }
@@ -364,6 +434,14 @@ public class CommunicationHandler {
     }
 
 
+    /**
+     * Update an existing access policy with a new PolicySet
+     * @param role role to be used
+     * @param location relative location of the file/dir matching the access policy
+     * @param policySet new access policy
+     * @return true if successfull
+     * @throws Exception
+     */
     @SuppressWarnings("unchecked")
     public static boolean savePolicySet(String role, String location, PolicySet policySet) throws Exception {
         PolicySet result = null;
@@ -371,6 +449,7 @@ public class CommunicationHandler {
 
         Connection conn = cman.getConnection(cloudParam);
 
+        /*Gather connect info and possible saved token*/
         ConnectInfo info = new ConnectInfo();
         info.setAction(action);
         info.setRel_location(location);
@@ -381,22 +460,27 @@ public class CommunicationHandler {
             info.setAuthToken(saved);
         }
 
+        /*Start push policy process*/
         conn.send("PUSH_POLICY");
         conn.send(info);
 
+        /*Authenticate role*/
         SendRoleProof(conn, role);
 
         switch ((String) conn.receive()) {
+            /*Token correct, send new PolicySet*/
             case "OK":
                 System.out.println("Token valid: receiving PolicySet");
                 conn.send(policySet);
                 conn.close();
                 return true;
+            /*Authorization is needed, request a token first*/
             case "AUTHENTICATE":
                 System.out.println("Need to authenticate");
                 UUID session = (UUID) conn.receive();
                 conn.close();
 
+                /*Request a token from the verification server*/
                 AuthToken token = getToken(role, action, session);
                 if (token != null) {
                     ContextManager.addToken(role + location, action, token);
@@ -404,6 +488,7 @@ public class CommunicationHandler {
                     conn = cman.getConnection(cloudParam);
                     info.setAuthToken(token);
 
+                    /*Retry push policy process*/
                     conn.send("PUSH_POLICY");
                     conn.send(info);
 
@@ -425,6 +510,12 @@ public class CommunicationHandler {
     }
 
 
+    /**
+     * Authenticate with the storage server by sending a role proof
+     * @param conn connection with storage server
+     * @param role role to be used for generating a proof
+     * @throws Exception
+     */
     private static void SendRoleProof(Connection conn, String role) throws Exception {
         /*Load credential*/
         List<Credential> creds = new ArrayList<>();
@@ -441,17 +532,28 @@ public class CommunicationHandler {
         if (pol.getCredentialClaims().isEmpty()) {
             throw new Exception("Cannot satisfy claim");
         }
+
+        /*Generate proof and send it*/
         Proof proof = credman.generateProof(pol.getClaim(), nonce);
         conn.send(credman.serializeProof(proof));
     }
 
 
+    /**
+     * Request an access token from the verification server
+     * @param role role to be used for the token
+     * @param action the action rights the user requests to be in the token (read or write)
+     * @param session session ID to initialize to communication, received earlier from the storage server
+     * @return The received access token or null if not received
+     * @throws Exception
+     */
     @SuppressWarnings("unchecked")
     private static AuthToken getToken(String role, String action, UUID session) throws Exception {
         AuthToken token = null;
 
         Connection conn = cman.getConnection(verificationParam);
 
+        /*Start process*/
         conn.send("AUTHENTICATE");
         conn.send(role);
         conn.send(action);
@@ -482,12 +584,14 @@ public class CommunicationHandler {
         /*System.out.println("Proof is valid: " + proof.isValid());
         System.out.println("Proof satistfies policy: " + proof.satisfiesPolicy(pol));*/
 
+        /*Create an answer for the received access policy*/
         PolicySetResponse resp = createAnswer(request);
 
         /*Send PolicySetResponse and role proof*/
         conn.send(resp);
         conn.send(credman.serializeProof(proof));
 
+        /*Answer is correct, receive access token*/
         if (conn.receive().equals("OK")) {
             token = (AuthToken) conn.receive();
         }
@@ -497,19 +601,28 @@ public class CommunicationHandler {
     }
 
 
+    /**
+     * Create an answer for an access policy
+     * @param request Full access policy, including external credential policies and nonces
+     * @return PolicySetResponse with all the answers, answers for external credential policies are also included in Base64 encoding
+     * @throws Exception
+     */
     private static PolicySetResponse createAnswer(PolicyResponseRequest request) throws Exception {
         PolicySetResponse result = new PolicySetResponse();
 
         PolicySet policySet = request.getAccessPolicy();
         result.setId(policySet.getId());
 
+        /*try to create an answer for every policy from the policy set*/
         for (Policy policy : policySet.getPolicies()) {
             PolicyResponse polRes = new PolicyResponse();
             long age = policy.getAgeInMilliseconds();
 
+            /*try to create an answer for every item of a policy*/
             for (RequirementItem item : policy.getRequirementItems()) {
                 RequirementItemResponse itemRes = null;
 
+                /*handle every item type*/
                 switch (item.getType()) {
                     case "context":
                         itemRes = handleContext(age, item, request.getCredentialNonces().get(item.getId()));
@@ -525,12 +638,14 @@ public class CommunicationHandler {
                         continue;
                 }
 
+                /*an answer for the current item is found, add to the response*/
                 if (itemRes != null) {
                     itemRes.setId(item.getId());
                     polRes.addItem(itemRes);
                 }
             }
 
+            /*an answer for the current policy is found, add to the response*/
             if (!polRes.getItems().isEmpty()) {
                 polRes.setId(policy.getId());
                 result.addPolicy(polRes);
@@ -540,10 +655,18 @@ public class CommunicationHandler {
     }
 
 
+    /**
+     * Create an answer for a context rule, every context type is handled here
+     * @param age max age of the answer
+     * @param item context item
+     * @param nonce nonce if necessary (only with user-role-nearby-wlan) otherwise null
+     * @return RequirementItemResponse containing the answer, or null
+     */
     private static RequirementItemResponse handleContext(long age, RequirementItem item, Nonce nonce) {
         RequirementItemResponse response = new RequirementItemResponse();
 
         try {
+            /*Handle context types separate, answer source depends on trust level in certain cases*/
             switch (item.getData().getDataType()) {
                 case "location":
                     if (item.getOperation().getName().equals("equals-cell-id")) {
@@ -598,7 +721,6 @@ public class CommunicationHandler {
                     if (nonce == null) {
                         return null;
                     }
-                    //Proof proof = ContextManager.getCredentialProof(item.getOperation().getValue(0), nonce);
                     String proof = ContextManager.getCredentialProof(item.getOperation().getValue(0), nonce);
                     if (proof != null) {
                         response.addValue(proof);
